@@ -1,205 +1,377 @@
 <!doctype html>
 <html lang="it">
-<head>
-  <meta charset="utf-8" />
-  <title>NOVE25 Pendant Generator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 32px auto; padding: 0 16px; }
-    h1 { font-size: 1.6rem; margin-bottom: 16px; }
-    .card { border: 1px solid rgba(0,0,0,.15); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-    textarea { width: 100%; min-height: 120px; resize: vertical; padding: 10px; font-size: 1rem; }
-    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    button { padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(0,0,0,.2); cursor: pointer; }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
-    .thumb { border: 1px solid rgba(0,0,0,.1); border-radius: 12px; overflow: hidden; background: #fff; }
-    .thumb img { width: 100%; display: block; }
-    .muted { opacity: .7; font-size: .9rem; }
-    .pill { padding: 6px 10px; border: 1px solid rgba(0,0,0,.25); border-radius: 999px; cursor: pointer; user-select: none; }
-    .pill.active { background: rgba(0,0,0,.08); }
-    .files { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .chip { border: 1px dashed rgba(0,0,0,.35); border-radius: 10px; padding: 6px 10px; font-size: .9rem; display: inline-flex; align-items: center; gap: 6px; }
-    .chip button { border: none; background: transparent; cursor: pointer; font-size: 1rem; line-height: 1; }
-    /* Loading overlay */
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; z-index: 9999; }
-    .spinner { width: 56px; height: 56px; border: 6px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .controls { display: flex; align-items: center; gap: 12px; }
-    .controls .sizes { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-  </style>
-</head>
-<body>
-  <div class="overlay" id="overlay"><div class="spinner" aria-label="Caricamento"></div></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NOVE25 Pendant Generator</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;            /* sfondo bianco */
+        --panel: #f6f7f9;         /* riquadri grigio chiaro chiaro */
+        --text: #111827;          /* quasi nero */
+        --muted: #6b7280;         /* grigio */
+        --brand: #0ea5e9;         /* sky-500 */
+        --brand-strong: #0284c7;  /* sky-600 */
+        --accent: #06b6d4;        /* cyan-500 */
+        --border: #e5e7eb;        /* grigio molto chiaro */
+        --danger: #dc2626;
+        --ok: #16a34a;
+        --shadow: 0 8px 30px rgba(0,0,0,.06);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        position: sticky; top: 0; z-index: 30;
+        backdrop-filter: saturate(180%) blur(6px);
+        background: rgba(255,255,255,.85);
+        border-bottom: 1px solid var(--border);
+      }
+      .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+      .brand { display:flex; align-items:center; gap:12px; font-weight: 700; }
+      .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--brand)); box-shadow: var(--shadow); }
 
-  <h1>NOVE25 Pendant Generator</h1>
-
-  <div class="card">
-    <div class="controls">
-      <div class="row" style="gap: 8px;">
-        <span class="muted">Stile:</span>
-        <span id="style-3d" class="pill active">3D</span>
-        <span id="style-basrelief" class="pill">Bassorilievo</span>
-      </div>
-      <div class="sizes">
-        <span class="muted">Dimensione:</span>
-        <span id="size-20" class="pill">20 mm</span>
-        <span id="size-30" class="pill active">30 mm</span>
-        <span id="size-40" class="pill">40 mm</span>
-        <span id="size-60" class="pill">60 mm</span>
-      </div>
-    </div>
-
-    <textarea id="prompt" placeholder="Scrivi il tema/motivo (il metallo sarà sempre silver brunish su sfondo nero)."></textarea>
-
-    <div class="row" style="margin-top: 10px;">
-      <label class="pill" for="refFiles">+ Allegare immagini (fino a 5)</label>
-      <input id="refFiles" type="file" accept="image/*" multiple style="display:none" />
-      <div id="fileList" class="files"></div>
-    </div>
-
-    <div class="row" style="margin-top: 10px;">
-      <button id="generate">Genera</button>
-      <div id="status" class="muted"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Risultati</h2>
-    <div id="out" class="grid"></div>
-  </div>
-
-<script>
-  const btn = document.getElementById('generate');
-  const promptEl = document.getElementById('prompt');
-  const out = document.getElementById('out');
-  const statusEl = document.getElementById('status');
-  const pill3d = document.getElementById('style-3d');
-  const pillBas = document.getElementById('style-basrelief');
-  const size20 = document.getElementById('size-20');
-  const size30 = document.getElementById('size-30');
-  const size40 = document.getElementById('size-40');
-  const size60 = document.getElementById('size-60');
-  const refFiles = document.getElementById('refFiles');
-  const fileList = document.getElementById('fileList');
-  const overlay = document.getElementById('overlay');
-
-  let style = '3d';
-  let size_mm = 30;
-  let imagesData = []; // data URLs
-
-  function setStyle(s) {
-    style = s;
-    pill3d.classList.toggle('active', s === '3d');
-    pillBas.classList.toggle('active', s === 'basrelief');
-  }
-  function setSize(mm) {
-    size_mm = mm;
-    [size20, size30, size40, size60].forEach(p => p.classList.remove('active'));
-    if (mm === 20) size20.classList.add('active');
-    if (mm === 30) size30.classList.add('active');
-    if (mm === 40) size40.classList.add('active');
-    if (mm === 60) size60.classList.add('active');
-  }
-
-  pill3d.addEventListener('click', () => setStyle('3d'));
-  pillBas.addEventListener('click', () => setStyle('basrelief'));
-  size20.addEventListener('click', () => setSize(20));
-  size30.addEventListener('click', () => setSize(30));
-  size40.addEventListener('click', () => setSize(40));
-  size60.addEventListener('click', () => setSize(60));
-
-  refFiles.addEventListener('change', async () => {
-    imagesData = [];
-    fileList.innerHTML = '';
-    const files = Array.from(refFiles.files || []).slice(0,5);
-    for (const f of files) {
-      const durl = await fileToDataURL(f);
-      imagesData.push(durl);
-      addChip(f.name, imagesData.length - 1);
-    }
-  });
-
-  function addChip(name, index) {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.dataset.index = String(index);
-    chip.innerHTML = `${name} <button title="Rimuovi" aria-label="Rimuovi">✕</button>`;
-    chip.querySelector('button').addEventListener('click', () => {
-      const idx = parseInt(chip.dataset.index, 10);
-      imagesData.splice(idx, 1);
-      rebuildChips();
-    });
-    fileList.appendChild(chip);
-  }
-
-  function rebuildChips() {
-    fileList.innerHTML = '';
-    imagesData.forEach((_, i) => addChip(`allegato_${i+1}`, i));
-  }
-
-  function fileToDataURL(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function setLoading(isLoading) {
-    overlay.style.display = isLoading ? 'flex' : 'none';
-    btn.disabled = isLoading;
-    promptEl.disabled = isLoading;
-    statusEl.textContent = isLoading ? "Generazione in corso…" : "Pronto";
-  }
-
-  async function generate() {
-    const prompt = promptEl.value.trim();
-    if (!prompt) {
-      statusEl.textContent = "Inserisci un prompt.";
-      return;
-    }
-    setLoading(true);
-    try {
-      const payload = { prompt, style, size_mm, images: imagesData, format: 'png' };
-      const res = await fetch('api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        let detail = `Errore ${res.status}`;
-        try {
-          const err = await res.json();
-          if (err && err.detail) detail = err.detail;
-        } catch {}
-        statusEl.textContent = `Errore: ${detail}`;
-        return;
+      .layout { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; }
+      @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+      @media (max-width: 540px) {
+        .layout { padding: 12px; }
       }
 
-      const data = await res.json();
-      out.innerHTML = '';
-      (data.images || []).forEach((dataUrl, i) => {
-        const fig = document.createElement('div');
-        fig.className = 'thumb';
-        const img = document.createElement('img');
-        img.src = dataUrl;
-        img.alt = `Immagine generata ${i+1}`;
-        fig.appendChild(img);
-        out.appendChild(fig);
-      });
-      statusEl.textContent = "Generazione completata ✅";
-    } catch (e) {
-      statusEl.textContent = `Errore di rete: ${e.message}`;
-    } finally {
-      setLoading(false);
-    }
-  }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+      .card-body { padding: 16px; }
+      .card-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 10px; }
+      .muted { color: var(--muted); }
 
-  btn.addEventListener('click', generate);
-</script>
-</body>
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .pill { border: 1px solid var(--border); padding: 8px 12px; border-radius: 999px; cursor: pointer; user-select:none; color: var(--muted); transition: .15s ease;
+              background: #ffffff; }
+      .pill:hover { color: var(--text); border-color: #d1d5db; }
+      .pill.active { color: var(--text); background: #e0f2fe; border-color: #bae6fd; }
+
+      textarea, input[type="text"] { width: 100%; background: #ffffff; color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 1rem; }
+      textarea { min-height: 130px; resize: vertical; }
+
+      .btn { display:inline-flex; align-items:center; gap:8px; padding: 12px 14px; background: #ffffff; border:1px solid var(--border); border-radius: 12px; cursor:pointer; color: var(--text); transition:.15s ease; font-weight:600; }
+      .btn:hover { border-color: #d1d5db; }
+
+      /* CTA principale evidenziata e centrata */
+      .cta-wrap { display:flex; justify-content:center; align-items:center; margin-top: 8px; }
+      .btn.primary { background: var(--brand); border-color: var(--brand); color: #ffffff; padding: 14px 22px; font-size: 1.05rem; box-shadow: 0 8px 20px rgba(2,132,199,.18); }
+      .btn.primary:hover { background: var(--brand-strong); border-color: var(--brand-strong); }
+      .btn:disabled { opacity:.6; cursor:not-allowed; }
+
+      .dropzone { border: 1px dashed #d1d5db; border-radius: 14px; padding: 12px; background:#ffffff; text-align:center; cursor:pointer; }
+      .chips { display:flex; gap:8px; flex-wrap: wrap; margin-top:8px; }
+      .chip { border: 1px dashed #d1d5db; border-radius: 999px; padding: 6px 10px; font-size: .9rem; color: var(--muted); display:flex; align-items:center; gap:6px; background:#fff; }
+      .chip button { background: none; border:none; color: var(--muted); cursor: pointer; }
+
+      .status { font-size: .95rem; margin-top: 10px; color: var(--muted); text-align:center; }
+      .status.ok { color: var(--ok); }
+      .status.warn { color: var(--danger); }
+
+      /* Galleria */
+      .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; align-items:start; }
+      .thumb { background: #ffffff; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; position: relative; }
+      .thumb img { width: 100%; display:block; background:#fff; }
+      .thumb .bar { position:absolute; inset-inline: 8px; bottom: 8px; display:flex; gap:8px; }
+      .tiny { font-size: .85rem; color: var(--muted); }
+
+      .toast { position: fixed; right:16px; bottom:16px; background:#111317; color:#e5e7eb; border:1px solid #2a2e35; border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); display:none; }
+
+      .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #d1d5db; border-top-color: #fff; animation: spin 1s linear infinite; }
+
+      /* Mobile <540px: risultati sotto e centrati */
+      @media (max-width: 540px) {
+        .btn, .pill { padding: 12px 14px; }
+        .gallery { grid-template-columns: 1fr; justify-items: center; }
+        .thumb { max-width: 420px; width: 100%; margin: 0 auto; }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container" style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="brand"><div class="logo"></div> <div>NOVE25 Pendant Generator</div></div>
+      </div>
+    </header>
+
+    <main class="container">
+      <div class="layout">
+        <!-- Controls -->
+        <section class="card">
+          <div class="card-body">
+            <div class="card-title">Impostazioni</div>
+
+            <div class="row" style="justify-content: space-between; margin-bottom:10px;">
+              <div class="row">
+                <span class="tiny">Stile</span>
+                <span id="style-3d" class="pill active">3D</span>
+                <span id="style-basrelief" class="pill">Bassorilievo</span>
+              </div>
+              <div class="row">
+                <span class="tiny">Dimensione</span>
+                <span id="size-20" class="pill">20 mm</span>
+                <span id="size-30" class="pill active">30 mm</span>
+                <span id="size-40" class="pill">40 mm</span>
+              </div>
+            </div>
+
+            <label class="tiny" for="prompt">Prompt</label>
+            <textarea id="prompt" placeholder="Es.: 'spirale organica', 'fiore stilizzato', 'Aurora' interpretato senza testo. Il metallo sarà sempre argento brunito lucido su sfondo nero."></textarea>
+
+            <div style="height: 10px;"></div>
+            <div class="tiny" style="margin-bottom:6px;">Riferimenti (max 5)</div>
+            <div id="drop" class="dropzone">
+              Trascina qui immagini o <button id="browse" class="btn" style="margin-left:6px;">Scegli file</button>
+              <input id="refFiles" type="file" accept="image/*" multiple style="display:none" />
+              <div class="chips" id="fileList"></div>
+            </div>
+
+            <div style="height: 14px;"></div>
+            <div class="cta-wrap">
+              <button id="generate" class="btn primary"><span class="spinner" id="spin" style="display:none"></span> Genera</button>
+            </div>
+
+            <div id="status" class="status"></div>
+          </div>
+        </section>
+
+        <!-- Results -->
+        <section class="card">
+          <div class="card-body">
+            <div class="card-title">Risultati</div>
+            <div id="out" class="gallery"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+      const btn = document.getElementById('generate');
+      const promptEl = document.getElementById('prompt');
+      const out = document.getElementById('out');
+      const statusEl = document.getElementById('status');
+      const pill3d = document.getElementById('style-3d');
+      const pillBas = document.getElementById('style-basrelief');
+      const size20 = document.getElementById('size-20');
+      const size30 = document.getElementById('size-30');
+      const size40 = document.getElementById('size-40');
+      const refFiles = document.getElementById('refFiles');
+      const fileList = document.getElementById('fileList');
+      const drop = document.getElementById('drop');
+      const browse = document.getElementById('browse');
+      const spin = document.getElementById('spin');
+
+      let style = '3d';
+      let size_mm = 30;
+      let imagesData = [];
+
+      function setStyle(s) {
+        style = s;
+        if (s === '3d') { pill3d.classList.add('active'); pillBas.classList.remove('active'); }
+        else { pillBas.classList.add('active'); pill3d.classList.remove('active'); }
+      }
+      function setSize(mm) {
+        size_mm = mm;
+        [size20, size30, size40].forEach(p => p.classList.remove('active'));
+        if (mm === 20) size20.classList.add('active');
+        if (mm === 30) size30.classList.add('active');
+        if (mm === 40) size40.classList.add('active');
+      }
+
+      pill3d.addEventListener('click', () => setStyle('3d'));
+      pillBas.addEventListener('click', () => setStyle('basrelief'));
+      size20.addEventListener('click', () => setSize(20));
+      size30.addEventListener('click', () => setSize(30));
+      size40.addEventListener('click', () => setSize(40));
+
+      browse.addEventListener('click', (e) => {
+        e.preventDefault();
+        refFiles.click();
+      });
+
+      refFiles.addEventListener('change', async () => {
+        await addFiles(Array.from(refFiles.files || []));
+        refFiles.value = '';
+      });
+
+      async function addFiles(files) {
+        const toAdd = files.slice(0, Math.max(0, 5 - imagesData.length));
+        for (const f of toAdd) {
+          const durl = await fileToDataURL(f);
+          imagesData.push(durl);
+          addChip(f.name, durl);
+        }
+        if (files.length > toAdd.length) showToast('Puoi allegare al massimo 5 immagini.');
+      }
+
+      function addChip(name, dataUrl) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `${name} <button title="Rimuovi">✕</button>`;
+        chip.querySelector('button').addEventListener('click', () => {
+          imagesData = imagesData.filter(x => x !== dataUrl);
+          chip.remove();
+        });
+        fileList.appendChild(chip);
+      }
+
+      ;['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, (e) => {
+        e.preventDefault(); e.stopPropagation(); drop.style.borderColor = 'var(--accent)';
+      }));
+      ;['dragleave','drop'].forEach(ev => drop.addEventListener(ev, (e) => {
+        e.preventDefault(); e.stopPropagation(); drop.style.borderColor = '#d1d5db';
+      }));
+      drop.addEventListener('drop', async (e) => {
+        const files = Array.from(e.dataTransfer.files || []);
+        await addFiles(files);
+      });
+
+      function fileToDataURL(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function generate() {
+        const prompt = promptEl.value.trim();
+        if (!prompt) {
+          setStatus('Inserisci un prompt.', 'warn');
+          return;
+        }
+        btn.disabled = true;
+        spin.style.display = 'inline-block';
+        setStatus('Generazione in corso…');
+        try {
+          const payload = { prompt, style, size_mm, images: imagesData, format: 'png' };
+          const res = await fetch('api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            let detail = `Errore ${res.status}`;
+            try {
+              const err = await res.json();
+              if (err && err.detail) detail = err.detail;
+            } catch {}
+            setStatus(`Errore: ${detail}`, 'warn');
+            return;
+          }
+
+          const data = await res.json();
+          out.innerHTML = '';
+          (data.images || []).forEach((dataUrl, i) => {
+            const fig = document.createElement('div');
+            fig.className = 'thumb';
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.alt = `Immagine generata ${i+1}`;
+
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+
+            const dl = document.createElement('button');
+            dl.className = 'btn';
+            dl.textContent = 'Scarica';
+            dl.addEventListener('click', () => downloadDataUrl(dataUrl, `pendant-${i+1}.png`));
+
+            const sv = document.createElement('button');
+            sv.className = 'btn';
+            sv.textContent = 'Salva…';
+            sv.addEventListener('click', () => saveDataUrl(dataUrl, `pendant-${i+1}.png`));
+
+            const cp = document.createElement('button');
+            cp.className = 'btn';
+            cp.textContent = 'Copia';
+            cp.addEventListener('click', async () => {
+              try {
+                const blob = await (await fetch(dataUrl)).blob();
+                await navigator.clipboard.write([
+                  new ClipboardItem({ [blob.type]: blob })
+                ]);
+                showToast('Immagine copiata negli appunti');
+              } catch (e) {
+                showToast('Copia non supportata in questo browser');
+              }
+            });
+
+            bar.appendChild(dl);
+            bar.appendChild(sv);
+            bar.appendChild(cp);
+            fig.appendChild(img);
+            fig.appendChild(bar);
+            out.appendChild(fig);
+          });
+          setStatus('Fatto ✅', 'ok');
+        } catch (e) {
+          setStatus(`Errore di rete: ${e.message}`, 'warn');
+        } finally {
+          btn.disabled = false;
+          spin.style.display = 'none';
+        }
+      }
+
+      function setStatus(msg, kind) {
+        statusEl.textContent = msg;
+        statusEl.className = 'status' + (kind ? ' ' + kind : '');
+      }
+
+      function downloadDataUrl(dataUrl, filename) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename || 'image.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      async function saveDataUrl(dataUrl, filename) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          if (window.showSaveFilePicker) {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: filename || 'image.png',
+              types: [{
+                description: 'PNG Image',
+                accept: { 'image/png': ['.png'] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            showToast('Immagine salvata');
+          } else {
+            // fallback: usa download
+            downloadDataUrl(dataUrl, filename);
+          }
+        } catch (e) {
+          showToast('Salvataggio annullato o non supportato');
+        }
+      }
+
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2200);
+      }
+
+      document.getElementById('generate').addEventListener('click', generate);
+    </script>
+  </body>
 </html>
