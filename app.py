@@ -1,4 +1,5 @@
-import os, base64
+import os
+import base64
 from io import BytesIO
 from typing import Optional, List
 
@@ -10,8 +11,6 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from google import genai
-from google.genai import types
-from PIL import Image
 
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -19,6 +18,7 @@ if not API_KEY:
     raise RuntimeError("Imposta la variabile d'ambiente GOOGLE_API_KEY")
 
 MODEL_ID = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+
 client = genai.Client(api_key=API_KEY)
 
 app = FastAPI(title="NOVE25 Pendant Generator", root_path="/aipendant")
@@ -42,6 +42,7 @@ class GenerateResponse(BaseModel):
     images: List[str]
 
 def _to_data_url(raw_bytes: bytes, mime: str = "image/png") -> str:
+    import base64
     b64 = base64.b64encode(raw_bytes).decode("utf-8")
     return f"data:{mime};base64,{b64}"
 
@@ -53,29 +54,32 @@ def _style_clause(style: str) -> str:
     s = (style or "3d").lower()
     if s == "basrelief":
         return "Design it as a BAS-RELIEF (bassorilievo): shallow relief, minimal depth, FRONT-FACING (frontal view). "
-    return "Design it as a FULL 3D pendant: volumetric, realistic occlusions/reflections, shown almost frontal with a very slight three-quarter tilt. "
+    return "Design it as a FULL 3D pendant: volumetric, realistic occlusions/reflections, shown almost frontal with a very slight three-quarter tilt (subtle) only to suggest depth. "
 
 def _size_clause(size_mm: int) -> str:
-    size = size_mm if size_mm in (20, 30, 40, 60) else 30
+    size = size_mm if size_mm in (20, 30, 40) else 30
     ratio = round(6/size, 2)
     return (
-        f"The PENDANT BODY HEIGHT must be ~{size} mm. "
-        "Keep the bail (\"maglina\") ABSOLUTELY CONSTANT across images: external height ~6 mm, internal opening ~4 mm. "
-        f"Ensure the proportion: at {size} mm body height the 6 mm bail should appear about {int(100*6/size)}%. "
+        f"The PENDANT BODY HEIGHT (excluding the bail) must be ~{size} mm. "
+        "Keep the bail (\"maglina\") ABSOLUTELY CONSTANT across images: external height ~6 mm, internal opening ~4 mm, same exact design and scale as previous images. "
+        f"Ensure the visual proportion reflects this: at {size} mm body height the 6 mm bail should appear about {int(100*6/size)}% of the body's height (approx. ratio {ratio}:1). "
+        + "Do NOT scale the bail to match the body; only scale the pendant body to reach the requested size. "
     )
 
 def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
     BASE = (
         "You are a jewelry designer. Create a photorealistic PRODUCT PHOTO of a "
-        "NECKLACE PENDANT ALWAYS in silver brunish. "
+        'NECKLACE PENDANT made entirely of polished darkened silver ("argento brunito lucido"). '
         + _style_clause(style) +
         _size_clause(size_mm) +
-        'Include a bail ("maglina") at the top that is ALWAYS the same design across images. '
-        "Do NOT include counter-bail or extra ring. Background: solid black. Lighting: studio-style. "
-        "Strict requirement: ALWAYS silver brunish. "
+        'Include a bail ("maglina") at the top that is ALWAYS the same design across images: '
+        "an oval polished metal bail, external height ~6mm, internal opening ~4mm tall, seamlessly connected to the pendant. "
+        "Do NOT include counter-bail or extra ring. "
+        "Background: solid black. Lighting: consistent studio-style. "
+        "Use ONLY silver (argento brunito lucido). NEVER use gold, rose gold, bronze, copper, or other materials/colors. "
     )
     if not _wants_text(user_prompt):
-        BASE += "Do NOT depict letters. Interpret words/names abstractly. "
+        BASE += "Do NOT depict letters. Interpret words/names abstractly as motifs. "
     BASE += "User design motif: "
     return BASE + user_prompt
 
@@ -84,6 +88,11 @@ def _data_url_to_inline(durl: str):
         return None
     header, b64 = durl.split(",", 1)
     mime = "image/png"
+    if ";base64" in header:
+        try:
+            mime = header.split("data:")[1].split(";")[0] or "image/png"
+        except Exception:
+            mime = "image/png"
     try:
         raw = base64.b64decode(b64)
     except Exception:
@@ -102,10 +111,11 @@ def generate_images(req: GenerateRequest):
         size_val = int(req.size_mm or 30)
     except Exception:
         size_val = 30
-    if size_val not in (20, 30, 40, 60):
+    if size_val not in (20, 30, 40):
         size_val = 30
 
     final_prompt = _build_pendant_prompt(prompt, style, size_val)
+
     contents = [final_prompt]
     if req.images:
         for durl in req.images[:5]:
@@ -114,13 +124,7 @@ def generate_images(req: GenerateRequest):
                 contents.append({"inline_data": inline})
 
     try:
-        response = client.models.generate_content(
-            model=MODEL_ID,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="1:1")
-            )
-        )
+        response = client.models.generate_content(model=MODEL_ID, contents=contents)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore chiamata API: {e}")
 
@@ -137,14 +141,6 @@ def generate_images(req: GenerateRequest):
             if inline_data and getattr(inline_data, "data", None):
                 data_field = inline_data.data
                 raw_bytes = data_field if isinstance(data_field, bytes) else base64.b64decode(data_field)
-                try:
-                    im = Image.open(BytesIO(raw_bytes)).convert("RGBA")
-                    im = im.resize((1024, 1024), Image.LANCZOS)
-                    buf = BytesIO()
-                    im.save(buf, format="PNG")
-                    raw_bytes = buf.getvalue()
-                except Exception:
-                    pass
                 results.append(_to_data_url(raw_bytes, "image/png"))
 
     if not results:
