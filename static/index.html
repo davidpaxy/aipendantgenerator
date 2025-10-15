@@ -6,87 +6,109 @@
     <title>NOVE25 Pendant Generator</title>
     <link rel="icon" href="data:," />
     <style>
-      :root {
+      :root{
         color-scheme: light;
-        --bg: #ffffff;
-        --panel: #f6f7f9;
-        --text: #111827;
-        --muted: #6b7280;
-        --brand: #3f3f46;
-        --brand-strong: #1f2937;
-        --border: #e5e7eb;
-        --danger: #dc2626;
-        --ok: #16a34a;
-        --shadow: 0 8px 30px rgba(0,0,0,.06);
-        --radius: 16px;
+        --bg:#ffffff; --panel:#f6f7f9; --text:#111827; --muted:#6b7280;
+        --brand:#3f3f46; --border:#e5e7eb; --ok:#16a34a; --danger:#dc2626;
+        --shadow:0 8px 30px rgba(0,0,0,.06); --radius:16px;
       }
-      * { box-sizing: border-box; }
-      html, body { height: 100%; }
-      body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background: var(--bg); color: var(--text); }
-      header { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.85); border-bottom: 1px solid var(--border); }
-      .container { max-width: 1600px; margin: 0 auto; padding: 16px; }
-      .brand { display:flex; align-items:center; gap:12px; font-weight: 700; }
-      .logo { width: 120px; height: auto; }
+      *{box-sizing:border-box}
+      html,body{height:100%}
+      body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+      header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.85);border-bottom:1px solid var(--border)}
+      .container{max-width:1600px;margin:0 auto;padding:16px}
+      .brand{display:flex;align-items:center;gap:12px;font-weight:700}
+      .logo{width:60px;height:auto}
 
-      .layout { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 16px; }
-      @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
-      @media (max-width: 540px) { .layout { padding: 12px; } }
+      .layout{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
+      @media (max-width:960px){.layout{grid-template-columns:1fr}}
+      @media (max-width:540px){.layout{padding:12px}}
 
-      .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-      .card-body { padding: 16px; }
-      .card-title { font-size: 1.1rem; font-weight: 700; margin: 0 0 10px; }
-      .muted { color: var(--muted); }
+      .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+      .card-body{padding:16px}
+      .card-title{font-size:1.1rem;font-weight:700;margin:0 0 10px}
+      .tiny{font-size:.9rem;color:var(--muted)}
+      .muted{color:var(--muted)}
+      .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
-      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-      .pill { border: 1px solid var(--border); padding: 8px 12px; border-radius: 999px; cursor: pointer; color: var(--muted); background: #fff; transition: .15s ease; }
-      .pill:hover { border-color: #d1d5db; color: var(--text); }
-      .pill.active { color: var(--text); background: #eef2f7; border-color: #d1d5db; }
+      .pill{border:1px solid var(--border);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);background:#fff;transition:.15s ease}
+      .pill:hover{border-color:#d1d5db;color:var(--text)}
+      .pill.active{color:var(--text);background:#eef2f7;border-color:#d1d5db}
 
-      textarea { width: 100%; background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 1rem; min-height: 130px; }
-      textarea::placeholder { color: var(--muted); opacity: .4; }
+      textarea{width:100%;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:1rem;min-height:120px}
+      textarea::placeholder{color:var(--muted);opacity:.5}
 
-      .btn { padding: 6px 10px; background: #fff; border:1px solid var(--border); border-radius: 12px; cursor:pointer; font-weight:600; }
-      .btn.primary { background: var(--brand); border-color: var(--brand); color:#fff; padding: 14px 22px; font-size:1.1rem; box-shadow: 0 8px 20px rgba(0,0,0,.08); }
-      .btn:disabled { opacity:.6; cursor:not-allowed; }
+      .btn{padding:12px 14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;font-weight:600}
+      .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;padding:14px 22px;font-size:1.1rem;box-shadow:0 8px 20px rgba(0,0,0,.08)}
+      .btn:disabled{opacity:.6;cursor:not-allowed}
+      .cta-wrap{display:flex;justify-content:center;margin-top:8px}
 
-      .cta-wrap { display:flex; justify-content:center; margin-top: 50px; }
+      .dropzone{border:1px dashed var(--border);border-radius:12px;padding:12px;background:#fff;text-align:center;cursor:pointer;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+      #fileList{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 
-      .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; justify-items: center; }
-      .thumb { background: #fff; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; text-align:center; padding: 12px; display:flex; flex-direction:column; align-items:center; position: relative; }
-      .thumb img { width: 100%; height: auto; max-width: 1024px; max-height: 1024px; object-fit: cover; aspect-ratio: 1 / 1; background: #000; display:flex; justify-content:center; align-items:center; margin:0 auto; }
-      .thumb .bar { margin-top: 8px; }
-      .thumb .close { position:absolute; top:6px; right:6px; width:28px; height:28px; border-radius:50%; background: rgba(0,0,0,.45); color:#fff; border:1px solid rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-weight:700; line-height:1; cursor:pointer; user-select:none; }
-      .thumb .close:hover { background: rgba(0,0,0,.65); }
+      /* anteprima nella dropzone */
+      #fileList .preview{position:relative;display:inline-flex;align-items:center;justify-content:center;width:120px;height:120px;margin-top:10px;border:1px solid var(--border);border-radius:12px;background:#fafafa;overflow:hidden}
+      #fileList .preview img{width:100%;height:100%;object-fit:contain;background:#fff}
+      #fileList .remove{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);font-weight:700;line-height:1;cursor:pointer}
+      #fileList .remove:hover{background:rgba(0,0,0,.65)}
 
-      /* Lightbox fullscreen */
-      .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; z-index: 1000; }
-      .lightbox.open { display: flex; }
-      .lightbox img { max-width: 95vw; max-height: 90vh; object-fit: contain; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.6); cursor: zoom-out; }
-      .lightbox .lightbox-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 999px; background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.35); font-size: 22px; display:flex; align-items:center; justify-content:center; cursor: pointer; }
+      .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;justify-items:center}
+      .thumb{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;text-align:center;padding:12px;display:flex;flex-direction:column;align-items:center;position:relative}
+      .thumb img{width:100%;height:auto;max-width:1024px;max-height:1024px;object-fit:cover;aspect-ratio:1/1;background:#000;display:flex;justify-content:center;align-items:center;margin:0 auto}
+      .thumb .bar{margin-top:8px}
+      .thumb .close{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1;cursor:pointer}
+      .thumb .close:hover{background:rgba(0,0,0,.65)}
 
-      .status { margin-top:10px; font-size:.95rem; color: var(--muted); text-align:center; min-height: 1.2em; }
-      .status.ok { color: var(--ok); }
-      .status.warn { color: var(--danger); }
-      .dropzone { border: 1px dashed var(--border); border-radius: 12px; padding: 12px; background:#fff; text-align:center; cursor:pointer; min-height:120px; display:flex; align-items:center; justify-content:center; }
+      .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:1000}
+      .lightbox.open{display:flex}
+      .lightbox img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);cursor:zoom-out}
+      .lightbox .lightbox-close{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 
-      @media (max-width: 540px) {
-        .gallery { grid-template-columns: 1fr; justify-items:center; }
-        .thumb { max-width: 420px; width:100%; }
+      .status{margin-top:10px;font-size:.95rem;color:var(--muted);text-align:center;min-height:1.2em}
+      .status.ok{color:var(--ok)}
+      .status.warn{color:var(--danger)}
+
+      /* Loader sotto il bottone: solo spinner, grande il doppio */
+      .loader{
+        display:none;
+        align-items:center;
+        justify-content:center;
+        margin-top:16px;
+      }
+      .loader.show{display:flex}
+      .loader .spinner{
+        width:44px;
+        height:44px;
+        border:6px solid #e5e7eb;
+        border-top-color:#6b7280;
+        border-radius:50%;
+        animation:spin .9s linear infinite;
+      }
+      @keyframes spin{to{transform:rotate(360deg)}}
+
+      @media (max-width:540px){
+        .gallery{grid-template-columns:1fr;justify-items:center}
+        .thumb{max-width:420px;width:100%}
       }
     </style>
   </head>
   <body>
     <header>
-      <div class="container" style="display:flex; align-items:center; justify-content:space-between;">
-        <div class="brand"><img class="logo" src="https://dev.argentum.company/logonove25.jpg" alt="NOVE25 Logo" /> <div>NOVE25 Pendant Generator</div></div>
+      <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="brand">
+          <img class="logo" src="https://dev.argentum.company/logonove25.jpg" alt="NOVE25 Logo" />
+          <div>NOVE25 Pendant Generator</div>
+        </div>
       </div>
     </header>
 
     <main class="container">
       <div class="layout">
+        <!-- Pannello impostazioni -->
         <section class="card">
           <div class="card-body">
             <div class="card-title">Impostazioni</div>
+
             <div class="row" style="justify-content: space-between; margin-bottom:10px;">
               <div class="row">
                 <span class="tiny">Stile</span>
@@ -101,25 +123,32 @@
                 <span id="size-60" class="pill">60 mm</span>
               </div>
             </div>
+
             <label class="tiny" for="prompt">Prompt</label>
-            <textarea id="prompt" placeholder="Es.: 'spirale organica', 'fiore stilizzato', 'Aurora'..."></textarea>
-            
-            <div style="height: 10px;"></div>
-            <div class="tiny" style="margin-bottom:6px;">Allega immagini (max 5)</div>
+            <textarea id="prompt" placeholder="Es.: 'spirale organica', 'fiore stilizzato'… (puoi lasciare vuoto se alleghi 1 immagine)"></textarea>
+
+            <div style="height:10px"></div>
+            <div class="tiny" style="margin-bottom:6px;">Allega immagine (max 1)</div>
             <div id="drop" class="dropzone">
-              Trascina qui oppure <button id="browse" class="btn" style="margin-left:6px;">Scegli file</button>
-              <input id="refFiles" type="file" accept="image/*" multiple style="display:none" />
+              <span id="dzText">Trascina qui oppure </span>
+              <button id="browse" class="btn" style="margin-left:6px;">Scegli file</button>
+              <input id="refFiles" type="file" accept="image/*" style="display:none" />
               <div class="chips" id="fileList"></div>
             </div>
-            
-            <div style="height: 12px;"></div>
-            <div class="cta-wrap">
-              <button id="generate" class="btn primary">CREA</button>
+
+            <div style="height:12px"></div>
+            <div class="cta-wrap"><button id="generate" class="btn primary">CREA</button></div>
+
+            <!-- Loader sotto il bottone (solo spinner) -->
+            <div id="loader" class="loader" aria-hidden="true">
+              <div class="spinner" aria-label="Caricamento"></div>
             </div>
-            <div id="status" class="status"></div>
+
+            <div id="status" class="status" role="status" aria-live="polite"></div>
           </div>
         </section>
 
+        <!-- Pannello risultati -->
         <section class="card">
           <div class="card-body">
             <div class="card-title">Risultati</div>
@@ -129,13 +158,14 @@
       </div>
     </main>
 
-    <!-- Lightbox per ingrandimento immagini -->
+    <!-- Lightbox -->
     <div id="lightbox" class="lightbox" aria-hidden="true">
       <img id="lightbox-img" alt="Anteprima ingrandita" />
       <button class="lightbox-close" aria-label="Chiudi">×</button>
     </div>
 
     <script>
+      // Elementi UI
       const btn = document.getElementById('generate');
       const promptEl = document.getElementById('prompt');
       const out = document.getElementById('out');
@@ -150,15 +180,32 @@
       const fileList = document.getElementById('fileList');
       const browse = document.getElementById('browse');
       const drop = document.getElementById('drop');
-      const MAX_RESULTS = 8;  // numero massimo di immagini mostrate
+      const dzText = document.getElementById('dzText');
 
+      const loader = document.getElementById('loader');
+
+      // Config
+      const MAX_RESULTS = 5;
+      const MAX_REFS = 1; // una sola immagine
+
+      // Stato
       let style = '3d';
       let size_mm = 30;
-      let imagesData = [];
+      let imagesData = []; // [dataURL] max 1
 
-      function setStyle(s){ style=s; pill3d.classList.toggle('active',s==='3d'); pillBas.classList.toggle('active',s==='basrelief'); }
-      function setSize(mm){ size_mm=mm; [size20,size30,size40,size60].forEach(p=>p.classList.remove('active')); if(mm===20)size20.classList.add('active'); if(mm===30)size30.classList.add('active'); if(mm===40)size40.classList.add('active'); if(mm===60)size60.classList.add('active'); }
+      // Helpers UI
+      function setStyle(s){ style=s; pill3d.classList.toggle('active', s==='3d'); pillBas.classList.toggle('active', s==='basrelief'); }
+      function setSize(mm){ size_mm=mm; [size20,size30,size40,size60].forEach(p=>p.classList.remove('active')); ({20:size20,30:size30,40:size40,60:size60}[mm]).classList.add('active'); }
       function setStatus(msg, kind){ statusEl.textContent = msg || ''; statusEl.className = 'status' + (kind ? ' ' + kind : ''); }
+
+      function showLoader(){
+        loader.classList.add('show');
+        loader.setAttribute('aria-hidden','false');
+      }
+      function hideLoader(){
+        loader.classList.remove('show');
+        loader.setAttribute('aria-hidden','true');
+      }
 
       pill3d.onclick=()=>setStyle('3d');
       pillBas.onclick=()=>setStyle('basrelief');
@@ -167,74 +214,161 @@
       size40.onclick=()=>setSize(40);
       size60.onclick=()=>setSize(60);
 
+      // Drag & drop safe
       ['dragenter','dragover','dragleave','drop'].forEach(evt=>{
         document.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); }, false);
       });
-      browse && (browse.onclick=(e)=>{ e.preventDefault(); refFiles.click(); });
-      refFiles && refFiles.addEventListener('change', async ()=>{ await addFiles(refFiles.files||[]); refFiles.value=''; });
 
-      function fileToDataURL(file){
-        return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=e=>reject(e); r.readAsDataURL(file); });
+      // Apri file picker
+      browse && (browse.onclick=(e)=>{ e.preventDefault(); refFiles.click(); });
+
+      // Selezione file
+      refFiles && refFiles.addEventListener('change', async ()=>{
+        await addFiles(refFiles.files || []);
+        refFiles.value = '';
+      });
+
+      // Anteprima + resize lato client
+      async function fileToDataURLResized(file, maxSide = 768, mime = 'image/jpeg', quality = 0.9){
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        return canvas.toDataURL(mime, quality);
       }
+
       async function addFiles(files){
-        const asArray = Array.from(files||[]).filter(Boolean);
-        const toAdd = asArray.slice(0, Math.max(0, 5 - imagesData.length));
-        for(const f of toAdd){ const d = await fileToDataURL(f); imagesData.push(d); addChip(f.name||'immagine', d); }
-        if(asArray.length > toAdd.length) setStatus('Limite: max 5 immagini.', 'warn');
+        const f = (files && files[0]) || null;
+        if(!f) return;
+        const d = await fileToDataURLResized(f, 768);
+        imagesData = [d];            // tieni SOLO la prima
+        renderFilePreview(d);        // mini-anteprima nella dropzone
       }
-      function addChip(name, dataUrl){
-        const chip=document.createElement('span'); chip.className='chip'; chip.style.border='1px dashed var(--border)'; chip.style.borderRadius='999px'; chip.style.padding='6px 10px'; chip.style.marginTop='6px'; chip.textContent=name+" ";
-        const rm=document.createElement('button'); rm.textContent='✕'; rm.style.marginLeft='6px'; rm.style.background='none'; rm.style.border='none'; rm.style.cursor='pointer'; rm.onclick=()=>{ imagesData = imagesData.filter(x=>x!==dataUrl); chip.remove(); };
-        chip.appendChild(rm); fileList.appendChild(chip);
+
+      function renderFilePreview(dataUrl){
+        if (dzText) dzText.style.display = 'none';
+        fileList.innerHTML = '';
+        const wrap = document.createElement('div');
+        wrap.className = 'preview';
+        const img = document.createElement('img');
+        img.alt = 'Anteprima';
+        img.src = dataUrl;
+        const rm = document.createElement('button');
+        rm.className = 'remove';
+        rm.setAttribute('aria-label', 'Rimuovi immagine');
+        rm.textContent = '×';
+        rm.onclick = () => {
+          imagesData = [];
+          fileList.innerHTML = '';
+          if (dzText) dzText.style.display = '';
+        };
+        wrap.appendChild(img);
+        wrap.appendChild(rm);
+        fileList.appendChild(wrap);
       }
-      if(drop){
+
+      // Drop nella dropzone
+      if (drop){
         const hi = ()=> drop.style.borderColor = '#9ca3af';
         const lo = ()=> drop.style.borderColor = 'var(--border)';
         ['dragenter','dragover'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); hi(); e.dataTransfer.dropEffect='copy'; }, false));
         ['dragleave','drop'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); lo(); }, false));
         drop.addEventListener('drop', async (e)=>{
           const dt = e.dataTransfer; let files = [];
-          if(dt){ if(dt.files && dt.files.length){ files = Array.from(dt.files); }
-                   else if(dt.items && dt.items.length){ files = Array.from(dt.items).filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean); } }
+          if(dt){
+            if(dt.files && dt.files.length){ files = Array.from(dt.files); }
+            else if(dt.items && dt.items.length){ files = Array.from(dt.items).filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean); }
+          }
           await addFiles(files);
         }, false);
       }
 
+      // Fetch con timeout
+      async function fetchWithTimeout(resource, options = {}, ms = 25000){
+        const controller = new AbortController();
+        const id = setTimeout(()=>controller.abort(), ms);
+        try { return await fetch(resource, { ...options, signal: controller.signal }); }
+        finally { clearTimeout(id); }
+      }
+
+      // Genera
       async function generate(){
-        const prompt=promptEl.value.trim();
-        if(!prompt){ setStatus('Inserisci un prompt.', 'warn'); return; }
-        btn.disabled=true; setStatus('Generazione in corso…');
+        const prompt = promptEl.value.trim();
+        const hasImage = imagesData && imagesData.length > 0;
+
+        // Regole: prompt vuoto + nessuna immagine => errore; altrimenti ok
+        if (!prompt && !hasImage) {
+          setStatus('Scrivi un motivo oppure allega un’immagine.', 'warn');
+          return;
+        }
+
+        btn.disabled = true;
+        setStatus(!prompt && hasImage ? 'Interpreto l’immagine e genero il pendente…' : 'Generazione in corso…');
+        showLoader();
+
         try{
-          const payload={prompt,style,size_mm,images:imagesData,format:'png',width:1024,height:1024};
-          const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          const payload = {
+            prompt,                 // può essere stringa vuota (caption lato server)
+            style,                  // '3d' | 'basrelief'
+            size_mm,                // 20 | 30 | 40 | 60
+            images: hasImage ? [imagesData[0]] : [],
+            format: 'png',
+            width: 1024,            // output sempre 1024×1024 lato server
+            height: 1024
+          };
+
+          const res = await fetchWithTimeout('/api/generate', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          }, 25000);
+
+          if(!res.ok){
+            const raw = await res.text();
+            setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn');
+            return;
+          }
           const ct = res.headers.get('content-type') || '';
-          if(!res.ok){ const raw = await res.text(); setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`,'warn'); return; }
-          if(!ct.includes('application/json')){ const raw = await res.text(); setStatus(`Risposta non-JSON: ${raw.slice(0,200)}`,'warn'); return; }
+          if(!ct.includes('application/json')){
+            const raw = await res.text();
+            setStatus(`Risposta non-JSON: ${raw.slice(0,200)}`, 'warn');
+            return;
+          }
           const data = await res.json();
-          (data.images||[]).forEach((dataUrl)=> addResult(dataUrl));
+          if(!Array.isArray(data.images) || data.images.length === 0){
+            setStatus('Nessuna immagine generata.', 'warn');
+            return;
+          }
+          data.images.forEach(addResult);
           setStatus('Fatto ✅','ok');
-        }catch(e){ setStatus(`Errore di rete: ${e.message}`,'warn'); console.error(e); }
-        finally{ btn.disabled=false; }
+        }catch(e){
+          setStatus(`Errore di rete: ${e.message}`, 'warn');
+          console.error(e);
+        } finally{
+          btn.disabled = false;
+          hideLoader();
+        }
       }
 
       function addResult(dataUrl){
-        const fig=document.createElement('div'); fig.className='thumb';
-        const img=document.createElement('img'); img.src=dataUrl; img.alt='Immagine generata';
-        // click/tap per aprire lightbox
+        const fig = document.createElement('div'); fig.className = 'thumb';
+        const img = document.createElement('img'); img.src = dataUrl; img.alt = 'Immagine generata';
         img.addEventListener('click', ()=> openLightbox(img.src), {passive:true});
-        const close=document.createElement('button'); close.className='close'; close.setAttribute('aria-label','Rimuovi'); close.textContent='×';
-        close.onclick=()=>{ fig.remove(); };
-        const bar=document.createElement('div'); bar.className='bar';
-        const dl=document.createElement('button'); dl.className='btn'; dl.textContent='Scarica'; dl.onclick=()=>downloadDataUrl(dataUrl,'pendant.png');
+        const close = document.createElement('button'); close.className = 'close'; close.setAttribute('aria-label','Rimuovi'); close.textContent = '×';
+        close.onclick = ()=>{ fig.remove(); };
+        const bar = document.createElement('div'); bar.className = 'bar';
+        const dl = document.createElement('button'); dl.className = 'btn'; dl.textContent = 'Scarica'; dl.onclick = ()=> downloadDataUrl(dataUrl, 'pendant-1024.png');
         bar.appendChild(dl);
-        fig.appendChild(img);
-        fig.appendChild(close);
-        fig.appendChild(bar);
+        fig.appendChild(img); fig.appendChild(close); fig.appendChild(bar);
         out.appendChild(fig);
         while(out.children.length > MAX_RESULTS){ out.removeChild(out.firstElementChild); }
       }
 
-      // Lightbox handlers (desktop + touch)
+      // Lightbox
       const lightbox = document.getElementById('lightbox');
       const lightboxImg = document.getElementById('lightbox-img');
       const lightboxClose = lightbox.querySelector('.lightbox-close');
@@ -250,34 +384,19 @@
         lightboxImg.src = '';
         document.body.style.overflow = '';
       }
-      // chiudi cliccando fuori o sul bottone o sull'immagine
       lightbox.addEventListener('click', (e)=>{
         if(e.target === lightbox || e.target === lightboxImg || e.target === lightboxClose){ closeLightbox(); }
       }, {passive:true});
-      // ESC per desktop
       window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && lightbox.classList.contains('open')) closeLightbox(); });
 
-      function downloadDataUrl(dataUrl, filename) {
+      function downloadDataUrl(dataUrl, filename){
         const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename || 'image.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        a.href = dataUrl; a.download = filename || 'image.png';
+        document.body.appendChild(a); a.click(); a.remove();
       }
-      btn.onclick=generate;
 
-      // --- Test minimi (non intrusivi) ---
-      (function runSmokeTests(){
-        try {
-          console.group('[TEST] Smoke');
-          console.assert(typeof downloadDataUrl === 'function', 'downloadDataUrl deve esistere');
-          console.assert(typeof addResult === 'function', 'addResult deve esistere');
-          console.assert(typeof openLightbox === 'function' && typeof closeLightbox === 'function', 'Lightbox API presente');
-          console.log('OK');
-        } catch(e) { console.warn('Smoke test failed', e); }
-        console.groupEnd?.();
-      })();
+      // Bind
+      btn.onclick = generate;
     </script>
   </body>
 </html>
