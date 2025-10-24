@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from google import genai
+# Importiamo genai.types per la configurazione
+from google.genai import types 
 
 # Post-processing immagini (monocromatico argento brunito + autoframing + detail)
 try:
@@ -239,13 +241,6 @@ _CONTROMAGLIA_INLINE = _load_contromaglia_inline()
 # Prompt builder (rinforzato per proporzioni e camera)
 # =============================================================================
 def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
-    """
-    Prompt testo con vincoli forti su proporzioni/ottica:
-    - monocromatico argento brunito
-    - contromaglia obbligatoria 8×4 mm integrata e leggermente incassata
-    - rapporto dimensionale contromaglia:corpo
-    - spessore percepito, margini, camera ortho-like (focale lunga)
-    """
     s = (style or "3d").lower()
     size = size_mm if size_mm in (20, 30, 40, 60) else 30
     style_line = (
@@ -254,19 +249,19 @@ def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
         else "FULL 3D quasi frontale (leggero tre-quarti, camera alta)."
     )
 
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA (Modifica 2)
+    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
     contromaglia_clause = (
-        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia: "
-        "riproducila **ESATTAMENTE** (forma, smusso e orientamento) come un elemento "
-        "fuso, spesso, leggermente incassato con raccordo morbido sulla parte superiore del ciondolo. "
-        "Non alterare il suo design. "
+        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia. "
+        "È un oggetto 'STOCK' da riprodurre **ESATTAMENTE** (forma, smusso e orientamento). "
+        "DEVE ESSERE IDENTICA. **Vietata ogni modifica, distorsione, reinterpretazione o variazione.** "
+        "Riproponi la contromaglia così com'è: un elemento fuso, spesso, leggermente incassato e raccordato morbido. "
     )
     
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
         "Contromaglia OBBLIGATORIA: tonda 8 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 0.9 mm con bordo sicurezza <1.2 mm. "
+        "Mantieni spessore percepito 3–4 mm con bordo sicurezza ≥1.2 mm. "
         "Assi e silhouette coerenti: niente stretching orizzontale/verticale, niente foreshortening marcato. "
         "Simmetria sull’asse verticale salvo soggetti esplicitamente asimmetrici."
     )
@@ -289,7 +284,7 @@ def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
         "Fotografia prodotto di un CIONDOLO in ARGENTO BRUNITO LUCIDO (monocromatico). "
         "Ignora qualunque colore: usa un unico metallo argento brunito. "
         f"Stile: {style_line} "
-        f"{contromaglia_clause}"  # <--- INSERIMENTO CLAUSOLA RINFORZATA
+        f"{contromaglia_clause}" 
         f"{proportions_block} "
         f"{framing_block} "
         f"{bans_block} "
@@ -300,25 +295,21 @@ def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
 
 
 def _build_copy_prompt(size_mm: int) -> str:
-    """
-    Prompt per copia fedele da immagine utente, con proporzioni e camera stabilizzate.
-    RINFORZATO per l'uso fedele della contromaglia.
-    """
     size = size_mm if size_mm in (20, 30, 40, 60) else 30
     
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA (Modifica 2)
+    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
     contromaglia_clause = (
-        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia: "
-        "riproducila **ESATTAMENTE** (forma, smusso e orientamento) come un elemento "
-        "fuso, spesso, leggermente incassato con raccordo morbido sulla parte superiore del ciondolo. "
-        "Non alterare il suo design. "
+        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia. "
+        "È un oggetto 'STOCK' da riprodurre **ESATTAMENTE** (forma, smusso e orientamento). "
+        "DEVE ESSERE IDENTICA. **Vietata ogni modifica, distorsione, reinterpretazione o variazione.** "
+        "Riproponi la contromaglia così com'è: un elemento fuso, spesso, leggermente incassato e raccordato morbido. "
     )
 
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: tonda 8×4 mm. "
+        "Contromaglia OBBLIGATORIA: tonda 8 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 0.9 mm, bordo <1.2 mm. "
+        "Mantieni spessore percepito 3–4 mm, bordo ≥1.2 mm. "
         "Niente stretching o deformazioni prospettiche marcate; simmetria sull’asse verticale."
     )
     
@@ -336,7 +327,7 @@ def _build_copy_prompt(size_mm: int) -> str:
         f"{proportions_block} "
         f"{framing_block} "
         f"{detail_block}"
-        f"{contromaglia_clause}" # <--- CLAUSOLA RINFORZATA
+        f"{contromaglia_clause}" 
         "RIPRODUCI FEDELMENTE il soggetto dell'immagine utente senza interpretazioni né varianti. "
         "Vietato: traforo/outline/wireframe/ritaglio piatto; corpo SOLIDO con smussi. "
         "Sfondo NERO pieno, luce da studio coerente. "
@@ -384,22 +375,31 @@ def generate_images(req: GenerateRequest):
     else:
         final_prompt = _build_pendant_prompt(user_prompt_input, style, size_val)
 
+    # Preparazione configurazione per minima casualità
+    config = genai.types.GenerateContentConfig(
+        temperature=0.1, # Minima tolleranza di variazione
+    )
+
     # Prepara contents per il modello immagine
-    # L'ordine è cruciale: [PROMPT, CONTROMAGLIA_1, CONTROMAGLIA_2, RIFERIMENTO UTENTE]
+    # [PROMPT, CONTROMAGLIA_1, CONTROMAGLIA_2, RIFERIMENTO UTENTE]
     contents: List[object] = [final_prompt]
 
-    # 1) Contromaglia fissa SEMPRE (INSERIMENTO DOPPIO - Modifica 1)
+    # 1) Contromaglia fissa SEMPRE (INSERIMENTO DOPPIO)
     if _CONTROMAGLIA_INLINE:
-        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) # 1° Immagine Riferimento
-        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) # 2° Immagine Riferimento (Duplicato)
+        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) 
+        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) 
 
     # 2) Riferimento utente (se presente)
     if first_user_inline:
         contents.append({"inline_data": first_user_inline})
 
-    # Chiamata al modello immagine
+    # Chiamata al modello immagine con configurazione rigida
     try:
-        response = client.models.generate_content(model=IMAGE_MODEL_ID, contents=contents)
+        response = client.models.generate_content(
+            model=IMAGE_MODEL_ID, 
+            contents=contents,
+            config=config # <--- CONFIGURAZIONE AGGIUNTA QUI
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Errore chiamata modello: {e}")
 
