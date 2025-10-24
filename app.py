@@ -264,9 +264,9 @@ def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
     
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: ovale 8×4 mm. "
+        "Contromaglia OBBLIGATORIA: tondo 8 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 3–4 mm con bordo sicurezza ≥1.2 mm. "
+        "Mantieni spessore percepito 0.9 mm con bordo sicurezza <1.2 mm. "
         "Assi e silhouette coerenti: niente stretching orizzontale/verticale, niente foreshortening marcato. "
         "Simmetria sull’asse verticale salvo soggetti esplicitamente asimmetrici."
     )
@@ -310,15 +310,15 @@ def _build_copy_prompt(size_mm: int) -> str:
     contromaglia_clause = (
         "La PRIMA IMMAGINE ALLEGATA mostra il design preciso della contromaglia. "
         "È un elemento di design **vincolante** che deve essere riprodotto **ESATTAMENTE** (forma, smusso e orientamento) "
-        "come un **piccolo elemento ovale fuso, spesso, leggermente incassato** con raccordo morbido sulla parte superiore del ciondolo. "
+        "come un **piccolo elemento tondo fuso, spesso, leggermente incassato** con raccordo morbido sulla parte superiore del ciondolo. "
         "Non alterare il suo design: copialo fedelmente, applicando solo la texture argento brunito. "
     )
 
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: ovale 8×4 mm. "
+        "Contromaglia OBBLIGATORIA: tonda 8 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 3–4 mm, bordo ≥1.2 mm. "
+        "Mantieni spessore percepito .9 mm, bordo <1.2 mm. "
         "Niente stretching o deformazioni prospettiche marcate; simmetria sull’asse verticale."
     )
     
