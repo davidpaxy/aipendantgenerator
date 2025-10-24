@@ -254,19 +254,19 @@ def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
         else "FULL 3D quasi frontale (leggero tre-quarti, camera alta)."
     )
 
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
+    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA (Modifica 2)
     contromaglia_clause = (
-        "La PRIMA IMMAGINE ALLEGATA mostra il design preciso della contromaglia. "
-        "È un elemento di design **vincolante** che deve essere riprodotto **ESATTAMENTE** (forma, smusso e orientamento) "
-        "come un **piccolo elemento ovale fuso, spesso, leggermente incassato** con raccordo morbido sulla parte superiore del ciondolo. "
-        "Non alterare il suo design: copialo fedelmente, applicando solo la texture argento brunito. "
+        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia: "
+        "riproducila **ESATTAMENTE** (forma, smusso e orientamento) come un elemento "
+        "fuso, spesso, leggermente incassato con raccordo morbido sulla parte superiore del ciondolo. "
+        "Non alterare il suo design. "
     )
     
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: tondo 8 mm. "
+        "Contromaglia OBBLIGATORIA: ovale 8×4 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 0.9 mm con bordo sicurezza <1.2 mm. "
+        "Mantieni spessore percepito 3–4 mm con bordo sicurezza ≥1.2 mm. "
         "Assi e silhouette coerenti: niente stretching orizzontale/verticale, niente foreshortening marcato. "
         "Simmetria sull’asse verticale salvo soggetti esplicitamente asimmetrici."
     )
@@ -306,19 +306,19 @@ def _build_copy_prompt(size_mm: int) -> str:
     """
     size = size_mm if size_mm in (20, 30, 40, 60) else 30
     
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
+    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA (Modifica 2)
     contromaglia_clause = (
-        "La PRIMA IMMAGINE ALLEGATA mostra il design preciso della contromaglia. "
-        "È un elemento di design **vincolante** che deve essere riprodotto **ESATTAMENTE** (forma, smusso e orientamento) "
-        "come un **piccolo elemento tondo fuso, spesso, leggermente incassato** con raccordo morbido sulla parte superiore del ciondolo. "
-        "Non alterare il suo design: copialo fedelmente, applicando solo la texture argento brunito. "
+        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia: "
+        "riproducila **ESATTAMENTE** (forma, smusso e orientamento) come un elemento "
+        "fuso, spesso, leggermente incassato con raccordo morbido sulla parte superiore del ciondolo. "
+        "Non alterare il suo design. "
     )
 
     proportions_block = (
         f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: tonda 8 mm. "
+        "Contromaglia OBBLIGATORIA: ovale 8×4 mm. "
         f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito .9 mm, bordo <1.2 mm. "
+        "Mantieni spessore percepito 3–4 mm, bordo ≥1.2 mm. "
         "Niente stretching o deformazioni prospettiche marcate; simmetria sull’asse verticale."
     )
     
@@ -377,9 +377,6 @@ def generate_images(req: GenerateRequest):
     user_prompt_input = (req.prompt or "").strip()
 
     # Logica:
-    # - immagine + nessun prompt -> COPIA FEDELE 3D, MONOCROMATICA argento brunito
-    # - nessun prompt + nessuna immagine -> 400
-    # - prompt presente -> usa prompt con vincoli (monocromatico + maglina incassata + no traforo)
     if not user_prompt_input:
         if first_user_inline is None:
             raise HTTPException(status_code=400, detail="Scrivi un motivo oppure allega un’immagine.")
@@ -388,13 +385,13 @@ def generate_images(req: GenerateRequest):
         final_prompt = _build_pendant_prompt(user_prompt_input, style, size_val)
 
     # Prepara contents per il modello immagine
-    # L'ordine è cruciale: [PROMPT, CONTROMAGLIA, RIFERIMENTO UTENTE]
-    # La contromaglia è la PRIMA immagine allegata citata nel prompt.
+    # L'ordine è cruciale: [PROMPT, CONTROMAGLIA_1, CONTROMAGLIA_2, RIFERIMENTO UTENTE]
     contents: List[object] = [final_prompt]
 
-    # 1) Contromaglia fissa SEMPRE
+    # 1) Contromaglia fissa SEMPRE (INSERIMENTO DOPPIO - Modifica 1)
     if _CONTROMAGLIA_INLINE:
-        contents.append({"inline_data": _CONTROMAGLIA_INLINE})
+        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) # 1° Immagine Riferimento
+        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) # 2° Immagine Riferimento (Duplicato)
 
     # 2) Riferimento utente (se presente)
     if first_user_inline:
