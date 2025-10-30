@@ -1,445 +1,323 @@
-import os
-import glob
-import base64
-import mimetypes
-from typing import Optional, List
+import os, base64, asyncio, logging, hashlib, threading
+from collections import OrderedDict
+from typing import Optional, List, Final, Tuple
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
+import anyio
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-
 from google import genai
-# Importiamo genai.types per la configurazione
-from google.genai import types 
 
-# Post-processing immagini (monocromatico argento brunito + autoframing + detail)
-try:
-    from PIL import Image, ImageEnhance, ImageOps, ImageFilter
-    PIL_OK = True
-except Exception:
-    PIL_OK = False
-
-
-# =============================================================================
-# Config / Setup
-# =============================================================================
+# ============================== Config ======================================
 load_dotenv()
+log = logging.getLogger("toygen")
+logging.basicConfig(level=logging.INFO)
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise RuntimeError("Imposta la variabile d'ambiente GOOGLE_API_KEY")
-
 IMAGE_MODEL_ID = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
 ROOT_PATH = os.getenv("ROOT_PATH", "")
+GENAI_TIMEOUT_S: float = float(os.getenv("GENAI_TIMEOUT_S", "45"))
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS","").split(",") if o.strip()] or ["http://localhost:3000","http://127.0.0.1:3000"]
 
-client = genai.Client(api_key=API_KEY)
-app = FastAPI(title="NOVE25 Pendant Generator", root_path=ROOT_PATH)
+PIPELINE_VERSION: Final = "pendant-i2i-silver-gold-tolerant-v1"
 
-# CORS (aperto in dev; restringi in produzione)
+SUPPORTED_MIME = {"image/png","image/jpeg","image/webp"}
+MAX_IMAGE_BYTES = 18 * 1024 * 1024
+CANVAS_PX: Final = 1024
+FILL_RATIO_TARGET: Final = 0.72
+FILL_TOLERANCE: Final = 0.03
+FRAME_MARGIN_FRAC: Final = 0.10
+
+_MAX_CACHE_ITEMS = int(os.getenv("MAX_CACHE_ITEMS", "128"))
+_CACHE: "OrderedDict[str, bytes]" = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+
+# ============================== App =========================================
+client: Optional[genai.Client] = None
+app = FastAPI(title="Pendant Generator (tolerant)", root_path=ROOT_PATH)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS, allow_credentials=False,
+    allow_methods=["POST","GET","OPTIONS"], allow_headers=["Authorization","Content-Type"],
 )
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
 
-
-# =============================================================================
-# Models
-# =============================================================================
+# ============================== Schemi ======================================
 class GenerateRequest(BaseModel):
     prompt: Optional[str] = None
-    style: Optional[str] = "3d"        # "3d" | "basrelief"
-    size_mm: Optional[int] = 30        # 20 | 30 | 40 | 60
-    images: Optional[List[str]] = None      # Data URL; usiamo SOLO la prima
-
+    style: Optional[str] = "3d"          # tollerante
+    size_mm: Optional[int] = 30          # tollerante
+    material: Optional[str] = None       # "silver" | "gold" | "argento" | "oro" | None
+    images: List[str] = Field(default_factory=list)
+    format: Optional[str] = "png"
+    width: Optional[int] = 1024
+    height: Optional[int] = 1024
+    lighting: Optional[str] = "soft"     # "soft" | "hard"
 
 class GenerateResponse(BaseModel):
-    images: List[str]  # data URLs
+    images: List[str]
 
+# ============================== Prompt ======================================
+NEGATIVE_INSTRUCTIONS = (
+    "Vietato: gancio, anellino, occhiello, bail, asola, foro, catena, laccetto. "
+    "Vietato: supporti, piedistalli, pavimenti, ombre a terra. "
+    "Vietato: testo, loghi, watermark, etichette, appunti, frecce, quote, righelli, numeri, simboli tecnici, targhette o marchi."
+)
 
-# =============================================================================
-# Utils
-# =============================================================================
-def _to_data_url(raw_bytes: bytes, mime: str = "image/png") -> str:
-    b64 = base64.b64encode(raw_bytes).decode("utf-8")
-    return f"data:{mime};base64,{b64}"
+_ALLOWED_SIZES = [10,20,30,40,60]
 
+def _norm_style(s: Optional[str]) -> str:
+    if not s: return "3d"
+    s = s.strip().lower()
+    return "basrelief" if s.startswith("bas") else "3d"
 
-def _data_url_to_inline(durl: str):
-    if not durl or not durl.startswith("data:"):
-        return None
+def _norm_material(m: Optional[str]) -> str:
+    if not m: return "silver"
+    m = m.strip().lower()
+    if m in ("gold","oro"): return "gold"
+    return "silver"
+
+def _norm_size(mm: Optional[int]) -> int:
     try:
-        header, b64 = durl.split(",", 1)
-    except ValueError:
-        return None
-
-    mime = "image/png"
-    if ";base64" in header:
-        try:
-            mime = header.split("data:")[1].split(";")[0] or "image/png"
-        except Exception:
-            mime = "image/png"
-
-    try:
-        raw = base64.b64decode(b64)
+        mm = int(mm or 30)
     except Exception:
-        return None
+        return 30
+    # mappa al più vicino consentito
+    return min(_ALLOWED_SIZES, key=lambda v: abs(v - mm))
 
-    return {"mime_type": mime, "data": raw}
+def _norm_lighting(l: Optional[str]) -> str:
+    if not l: return "soft"
+    l = l.strip().lower()
+    return "hard" if l.startswith("hard") else "soft"
 
-
-# === Post-processing: forza “argento brunito” (monocromatico) =================
-def _silver_brunito_bytes(raw: bytes) -> bytes:
-    """
-    Desatura e regola leggermente contrasto/luminosità per un look coerente
-    'argento brunito'. Se PIL non è disponibile, restituisce i bytes originali.
-    """
-    if not PIL_OK:
-        return raw
-    try:
-        from io import BytesIO
-        im = Image.open(BytesIO(raw))
-        alpha = None
-        if im.mode in ("RGBA", "LA"):
-            alpha = im.getchannel("A")
-
-        # Grayscale “dolce”
-        gray = ImageOps.grayscale(im).convert("RGB")
-        # Contrasto e luminosità tarati per 'brunito'
-        gray = ImageEnhance.Contrast(gray).enhance(1.18)    # +18% contrasto
-        gray = ImageEnhance.Brightness(gray).enhance(0.94)  # -6% luce
-
-        if alpha is not None:
-            gray.putalpha(alpha)
-
-        out = BytesIO()
-        gray.save(out, format="PNG", optimize=True)
-        return out.getvalue()
-    except Exception:
-        return raw
-
-
-def _autoframe_on_black(png_bytes: bytes, target_px: int = 1024, fill_margin: float = 0.86) -> bytes:
-    """
-    Prende un'immagine con sfondo nero, trova il bbox del soggetto (pixel non-neri),
-    centra e scala affinché il lato lungo occupi ~fill_margin del canvas quadrato.
-    Restituisce PNG.
-    """
-    if not PIL_OK:
-        return png_bytes
-    from io import BytesIO
-    im = Image.open(BytesIO(png_bytes)).convert("RGBA")
-
-    # Maschera: preferisci alpha, altrimenti derivata da luminanza (soglia su nero)
-    try:
-        alpha = im.getchannel("A")
-        mask = alpha
-    except Exception:
-        lum = ImageOps.grayscale(im)
-        mask = lum.point(lambda x: 255 if x > 8 else 0, mode="1").convert("L")
-
-    bbox = mask.getbbox()
-    if not bbox:
-        return png_bytes  # fallback: immagine vuota o tutta nera
-
-    # Ritaglia soggetto, ridimensiona e centra su canvas quadrato
-    subject = im.crop(bbox)
-    w, h = subject.size
-    canvas = Image.new("RGBA", (target_px, target_px), (0, 0, 0, 255))
-    scale = (target_px * fill_margin) / max(w, h)
-    new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
-    subject = subject.resize(new_size, Image.LANCZOS)
-
-    x = (target_px - subject.size[0]) // 2
-    y = (target_px - subject.size[1]) // 2
-    canvas.paste(subject, (x, y), subject)
-
-    out = BytesIO()
-    canvas.save(out, format="PNG", optimize=True)
-    return out.getvalue()
-
-
-def _apply_detail_enhance(png_bytes: bytes, size_mm: int) -> bytes:
-    """
-    Aumenta nitidezza in modo graduale in base alla dimensione. Output PNG.
-    """
-    if not PIL_OK:
-        return png_bytes
-    from io import BytesIO
-    im = Image.open(BytesIO(png_bytes)).convert("RGBA")
-
-    # Parametri in funzione della taglia
-    if size_mm >= 60:
-        radius, percent = 1.4, 180  # UnsharpMask
-    elif size_mm >= 40:
-        radius, percent = 1.2, 150
-    elif size_mm >= 30:
-        radius, percent = 1.0, 120
-    else:
-        radius, percent = 0.8, 100
-
-    try:
-        im = im.filter(ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=3))
-    except Exception:
-        pass
-
-    out = BytesIO()
-    im.save(out, format="PNG", optimize=True)
-    return out.getvalue()
-
-
-def _target_px_for_size(size_mm: int) -> int:
-    """
-    Canvas quadrato in px in base alla dimensione del ciondolo:
-    20mm -> 896px, 30mm -> 1024px, 40mm -> 1280px, 60mm -> 1536px.
-    """
-    table = {20: 896, 30: 1024, 40: 1280, 60: 1536}
-    return table.get(size_mm, 1024)
-
-
-def _detail_clause(size: int) -> str:
-    if size >= 60:
-        return "Livello di dettaglio: micro-dettagli molto fini (texture metalliche leggere, micro-sfumature, piccoli raccordi e incisioni superficiali). "
-    if size >= 40:
-        return "Livello di dettaglio: dettagli fini ben visibili (smussi netti, superfici pulite con leggere variazioni). "
-    if size >= 30:
-        return "Livello di dettaglio: dettagli moderati, evita micro-texture troppo fitte. "
-    return "Livello di dettaglio: semplice e leggibile, evita pattern minuti che si perdono sotto i 20 mm. "
-
-
-# =============================================================================
-# Contromaglia fissa da /static/contromaglia.*
-# =============================================================================
-def _load_contromaglia_inline():
-    pattern = os.path.join(STATIC_DIR, "contromaglia.*")
-    files = sorted(glob.glob(pattern))
-    if not files:
-        print(f"[warn] contromaglia non trovata: {pattern}")
-        return None
-    path = files[0]
-    try:
-        with open(path, "rb") as f:
-            raw = f.read()
-        mime = mimetypes.guess_type(path)[0] or "image/png"
-        return {"mime_type": mime, "data": raw}
-    except Exception as e:
-        print(f"[warn] caricamento contromaglia fallito: {e}")
-        return None
-
-
-_CONTROMAGLIA_INLINE = _load_contromaglia_inline()
-
-
-# =============================================================================
-# Prompt builder (rinforzato per proporzioni e camera)
-# =============================================================================
-def _build_pendant_prompt(user_prompt: str, style: str, size_mm: int) -> str:
-    s = (style or "3d").lower()
-    size = size_mm if size_mm in (20, 30, 40, 60) else 30
-    style_line = (
-        "BAS-RELIEF frontale, basso rilievo (MA con volume reale; niente piattezza)."
-        if s == "basrelief"
-        else "FULL 3D quasi frontale (leggero tre-quarti, camera alta)."
-    )
-
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
-    contromaglia_clause = (
-        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia. "
-        "È un oggetto 'STOCK' da riprodurre **ESATTAMENTE** (forma, smusso e orientamento). "
-        "DEVE ESSERE IDENTICA. **Vietata ogni modifica, distorsione, reinterpretazione o variazione.** "
-        "Riproponi la contromaglia così com'è: un elemento fuso, spesso, leggermente incassato e raccordato morbido. "
-    )
-    
-    proportions_block = (
-        f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: tonda 8 mm. "
-        f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 3–4 mm con bordo sicurezza ≥1.2 mm. "
-        "Assi e silhouette coerenti: niente stretching orizzontale/verticale, niente foreshortening marcato. "
-        "Simmetria sull’asse verticale salvo soggetti esplicitamente asimmetrici."
-    )
-
-    framing_block = (
-        "Framing: soggetto centrato; margine nero 7–10% su tutti i lati. "
-        "Evita tagli e parti fuori inquadratura. "
-        "Ottica: resa ortho-like con focale lunga (≈ 85–135 mm equivalente), prospettiva molto contenuta."
-    )
-
-    bans_block = (
-        "Vietato: traforo/outline/wireframe/ritaglio piatto; niente scritte/numeri/smalti. "
-        "Corpo SOLIDO con smussi e raccordi morbidi. "
-        "Sfondo NERO pieno, luce da studio coerente."
-    )
-
-    detail_block = _detail_clause(size)
-
-    base = (
-        "Fotografia prodotto di un CIONDOLO in ARGENTO BRUNITO LUCIDO (monocromatico). "
-        "Ignora qualunque colore: usa un unico metallo argento brunito. "
-        f"Stile: {style_line} "
-        f"{contromaglia_clause}" 
-        f"{proportions_block} "
-        f"{framing_block} "
-        f"{bans_block} "
-        f"{detail_block}"
-        "Soggetto richiesto (senza lettere): "
-    )
-    return base + (user_prompt or "").strip()
-
-
-def _build_copy_prompt(size_mm: int) -> str:
-    size = size_mm if size_mm in (20, 30, 40, 60) else 30
-    
-    # CLAUSOLA AGGIUNTA/RINFORZATA PER LA CONTROMAGLIA
-    contromaglia_clause = (
-        "Le PRIME DUE IMMAGINI ALLEGATE sono riferimenti IDENTICI e **vincolanti** della contromaglia. "
-        "È un oggetto 'STOCK' da riprodurre **ESATTAMENTE** (forma, smusso e orientamento). "
-        "DEVE ESSERE IDENTICA. **Vietata ogni modifica, distorsione, reinterpretazione o variazione.** "
-        "Riproponi la contromaglia così com'è: un elemento fuso, spesso, leggermente incassato e raccordato morbido. "
-    )
-
-    proportions_block = (
-        f"Proporzioni: ciondolo ~{size} mm di altezza (ESCLUSO anellino). "
-        "Contromaglia OBBLIGATORIA: tonda 8 mm. "
-        f"Scala relativa: altezza contromaglia : altezza corpo ≈ 8 : {size}. "
-        "Mantieni spessore percepito 3–4 mm, bordo ≥1.2 mm. "
-        "Niente stretching o deformazioni prospettiche marcate; simmetria sull’asse verticale."
-    )
-    
-    framing_block = (
-        "Framing: soggetto centrato; margine nero 7–10% su tutti i lati. "
-        "Ottica ortho-like (≈ 85–135 mm eq.) per minimizzare distorsioni."
-    )
-    
-    detail_block = _detail_clause(size)
-
+def _constraints_block(size_mm: int, lighting: str, style: str, material: str) -> str:
+    target_px = int(round(CANVAS_PX * FILL_RATIO_TARGET))
+    tol_px = int(round(CANVAS_PX * FILL_TOLERANCE))
+    margin_pct = int(round(FRAME_MARGIN_FRAC * 100))
     return (
-        "Fotografia prodotto di un CIONDOLO in ARGENTO BRUNITO LUCIDO (monocromatico). "
-        "IGNORA COMPLETAMENTE i colori presenti nell'immagine utente: rendi tutto in un unico metallo ARGENTO BRUNITO LUCIDO. "
-        "Stile: FULL 3D quasi frontale (leggero tre-quarti, camera alta). "
-        f"{proportions_block} "
-        f"{framing_block} "
-        f"{detail_block}"
-        f"{contromaglia_clause}" 
-        "RIPRODUCI FEDELMENTE il soggetto dell'immagine utente senza interpretazioni né varianti. "
-        "Vietato: traforo/outline/wireframe/ritaglio piatto; corpo SOLIDO con smussi. "
-        "Sfondo NERO pieno, luce da studio coerente. "
-        "Nessuna scritta, lettering, numeri o smalti."
-    )
-
-
-# =============================================================================
-# Endpoint principale
-# =============================================================================
-@app.post("/api/generate", response_model=GenerateResponse)
-def generate_images(req: GenerateRequest):
-    # Stile
-    style = (req.style or "3d").lower()
-    if style not in ("3d", "basrelief"):
-        style = "3d"
-
-    # Taglia
-    try:
-        size_val = int(req.size_mm or 30)
-    except Exception:
-        size_val = 30
-    if size_val not in (20, 30, 40, 60):
-        size_val = 30
-
-    target_px = _target_px_for_size(size_val)
-
-    # Prima (ed unica) immagine utente
-    first_user_inline = None
-    if req.images:
-        for durl in req.images[:1]:
-            inline = _data_url_to_inline(durl)
-            if inline:
-                first_user_inline = inline
-                break
-
-    # Prompt utente
-    user_prompt_input = (req.prompt or "").strip()
-
-    # Logica:
-    if not user_prompt_input:
-        if first_user_inline is None:
-            raise HTTPException(status_code=400, detail="Scrivi un motivo oppure allega un’immagine.")
-        final_prompt = _build_copy_prompt(size_val)
-    else:
-        final_prompt = _build_pendant_prompt(user_prompt_input, style, size_val)
-
-    # Preparazione configurazione per minima casualità
-    config = genai.types.GenerateContentConfig(
-        temperature=0.1, # Minima tolleranza di variazione
-    )
-
-    # Prepara contents per il modello immagine
-    # [PROMPT, CONTROMAGLIA_1, CONTROMAGLIA_2, RIFERIMENTO UTENTE]
-    contents: List[object] = [final_prompt]
-
-    # 1) Contromaglia fissa SEMPRE (INSERIMENTO DOPPIO)
-    if _CONTROMAGLIA_INLINE:
-        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) 
-        contents.append({"inline_data": _CONTROMAGLIA_INLINE}) 
-
-    # 2) Riferimento utente (se presente)
-    if first_user_inline:
-        contents.append({"inline_data": first_user_inline})
-
-    # Chiamata al modello immagine con configurazione rigida
-    try:
-        response = client.models.generate_content(
-            model=IMAGE_MODEL_ID, 
-            contents=contents,
-            config=config # <--- CONFIGURAZIONE AGGIUNTA QUI
+        "CONSTRAINTS OBBLIGATORIE (seguire ALLA LETTERA):\n"
+        f"- LOOK & MATERIAL: Metallo reale — "
+        f"{('ARGENTO BRUNITO LUCIDO' if material=='silver' else 'ORO LUCIDO SATINATO (toni giallo oro realistici)')}.\n"
+        + (
+            "Saturazione colori = 0. Nessun colore residuo. I colori dell'immagine di riferimento, "
+            "se presenti, vanno tradotti in luminanza/texture/roughness del metallo (mai tinta).\n"
+            if material == "silver" else
+            "Colore metallo ORO realistico (18–22k). Tono fra #C9A227 e #E0C15A; riflessi caldi, mezzitoni dorati. "
+            "Vietato: tonalità argento/acciaio/grigio, verde o arancione intenso; niente patine non metalliche.\n"
         )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Errore chiamata modello: {e}")
+        + ("ILLUMINAZIONE: Softbox diffuso (riflessi ampi, zero hotspot).\n" if lighting=="soft"
+           else "ILLUMINAZIONE: Studio direzionale controllato (riflessi definiti, zero blowout).\n")
+        + "- SFONDO: Grigio chiarissimo #F2F2F2, uniforme, senza gradiente né ombre.\n"
+        + f"- INQUADRATURA/SCALA: Altezza oggetto ≈ {FILL_RATIO_TARGET*100:.0f}% del frame {CANVAS_PX}px "
+          f"(~{target_px}px, tolleranza ±{tol_px}px). Margini regolari ≈ {margin_pct}% ai bordi. "
+          "Niente crop aggressivo, niente zoom variabile tra generazioni.\n"
+        + f"- DIMENSIONE FISICA: Considera l’oggetto alto ~{size_mm} mm; spessori e rilievi plausibili per questa scala.\n"
+        + ("STILE: TRIDIMENSIONALE a tutto volume, leggera prospettiva 3/4.\n" if style=="3d"
+           else "STILE: BASSORILIEVO con percezione volumetrica credibile.\n")
+        + f"- DIVIETI: {NEGATIVE_INSTRUCTIONS}\n"
+    )
 
-    # Estrai la prima immagine utile dal primo candidato
-    results: List[str] = []
+def _detail_instruction(size_mm: int) -> str:
+    if size_mm <= 20:  return "Dettagli semplificati; silhouette leggibile; microincisioni poco profonde."
+    if size_mm == 30:  return "Dettagli moderati e puliti; evita micro-texture fitte; rilievi coerenti."
+    if size_mm == 40:  return "Buon dettaglio ma pulito; rilievi netti non fragili."
+    return "Dettaglio pieno ma pulito; rilievi e spessori ben definiti."
+
+def _header_line() -> str:
+    return "Fotografia prodotto 3D di un piccolo oggetto/pendente in metallo."
+
+def _build_text_only_prompt(user_prompt: str, style: str, size_mm: int, lighting: str, material: str) -> str:
+    return (
+        f"{_header_line()}\n"
+        f"{_constraints_block(size_mm, lighting, style, material)}"
+        f"{_detail_instruction(size_mm)}\n"
+        f"Soggetto: {user_prompt.strip()}"
+    )
+
+def _build_image_repro_prompt(style: str, size_mm: int, lighting: str, material: str, user_prompt: Optional[str]) -> str:
+    addon = f"\nIstruzioni aggiuntive: {user_prompt.strip()}" if user_prompt else ""
+    return (
+        f"{_header_line()}\n"
+        "TRASFORMAZIONE: Riproduci fedelmente l’IMMAGINE DI RIFERIMENTO nei minimi particolari, "
+        "ma come oggetto 3D reale (volume e rilievi fisicamente plausibili). Mantieni silhouette, proporzioni, posa, "
+        "posizione degli elementi, incisioni e micro-dettagli.\n"
+        f"CONVERSIONE MATERIALE: Mantieni forma, volume, dettagli, inquadratura e luce IDENTICI; "
+        f"cambia SOLO la finitura del metallo in {material}. \n"
+        f"{_constraints_block(size_mm, lighting, style, material)}"
+        f"{_detail_instruction(size_mm)}"
+        f"{addon}"
+    )
+
+# ============================== Utils =======================================
+def _cache_get(k: str) -> Optional[bytes]:
+    with _CACHE_LOCK:
+        v = _CACHE.get(k)
+        if v is not None: _CACHE.move_to_end(k)
+        return v
+
+def _cache_set(k: str, v: bytes) -> None:
+    with _CACHE_LOCK:
+        _CACHE[k] = v; _CACHE.move_to_end(k)
+        while len(_CACHE) > _MAX_CACHE_ITEMS: _CACHE.popitem(last=False)
+
+def _extract_first_image_bytes(response) -> Optional[bytes]:
     candidates = getattr(response, "candidates", None) or []
-    if not candidates:
-        raise HTTPException(status_code=500, detail="Risposta vuota.")
-
-    for cand in candidates[:1]:
+    for cand in candidates:
         content = getattr(cand, "content", None)
         parts = getattr(content, "parts", None) if content else None
-        if not parts:
-            continue
+        if not parts: continue
         for part in parts:
             inline_data = getattr(part, "inline_data", None)
             if inline_data and getattr(inline_data, "data", None):
                 data_field = inline_data.data
-                raw_bytes = data_field if isinstance(data_field, bytes) else base64.b64decode(data_field)
+                return data_field if isinstance(data_field, bytes) else base64.b64decode(data_field)
+            if getattr(part, "mime_type", "") == "image/png" and getattr(part, "data", None):
+                data_field = part.data
+                return data_field if isinstance(data_field, bytes) else base64.b64decode(data_field)
+    return None
 
-                # === Post-filtro: argento brunito + auto-framing + nitidezza adattiva ===
-                fixed = _silver_brunito_bytes(raw_bytes)
-                fixed = _autoframe_on_black(fixed, target_px=target_px, fill_margin=0.86)
-                fixed = _apply_detail_enhance(fixed, size_val)
+def _to_data_url(raw: bytes) -> str:
+    return f"data:image/png;base64,{base64.b64encode(raw).decode()}"
 
-                results.append(_to_data_url(fixed, "image/png"))
-                break
+def _decode_image_data_url(data_url: str) -> Tuple[Optional[bytes], Optional[str]]:
+    if not data_url or not isinstance(data_url, str): return None, None
+    s = data_url.strip().replace("\n","").replace("\r","")
+    if not s.startswith("data:"): return None, None
+    try: head, payload = s.split(",", 1)
+    except ValueError: return None, None
+    mime = "image/png"
+    if ";base64" in head:
+        m = head[5: head.index(";base64")].strip().lower()
+        if m: mime = m
+    try: raw = base64.b64decode(payload)
+    except Exception: return None, None
+    return raw, mime
 
-    if not results:
-        raise HTTPException(status_code=422, detail="Nessuna immagine generata.")
+def _detect_true_mime(raw: bytes) -> Optional[str]:
+    if not raw or len(raw) < 12: return None
+    sig4 = raw[:4]; sig3 = raw[:3]
+    if sig4 == b"\x89PNG": return "image/png"
+    if sig3 == b"\xff\xd8\xff": return "image/jpeg"
+    if sig4 == b"RIFF" and raw[8:12] == b"WEBP": return "image/webp"
+    head = raw[:256].lstrip()
+    if head.startswith(b"<svg") or head.startswith(b"<?xml"): return "image/svg+xml"
+    if sig4 in (b"ftyp", b"\x00\x00\x01\x00", b"BM", b"GIF8"): return "unsupported"
+    return None
 
-    return GenerateResponse(images=results)
+def _build_contents(final_prompt: str, ref_bytes: Optional[bytes], ref_mime: Optional[str]):
+    if ref_bytes:
+        return [{
+            "role":"user",
+            "parts":[
+                {"inline_data":{"mime_type":(ref_mime or "image/png"), "data": ref_bytes}},
+                {"text": final_prompt},
+            ],
+        }]
+    else:
+        return [{"role":"user","parts":[{"text":final_prompt}]}]
 
+# ============================== Startup =====================================
+@app.on_event("startup")
+def _startup():
+    global client
+    if not API_KEY: raise RuntimeError("Imposta GOOGLE_API_KEY")
+    client = genai.Client(api_key=API_KEY)
 
-# =============================================================================
-# Static & Index
-# =============================================================================
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# ============================== Core ========================================
+async def _run_inference(user_prompt: str,
+                         ref_bytes: Optional[bytes],
+                         ref_mime: Optional[str],
+                         style: str, size_mm: int, lighting: str, material: str) -> GenerateResponse:
+    if not user_prompt and not ref_bytes:
+        raise HTTPException(422, "Prompt mancante e nessuna immagine di riferimento")
 
+    final_prompt = (
+        _build_image_repro_prompt(style, size_mm, lighting, material, user_prompt or None)
+        if ref_bytes else
+        _build_text_only_prompt(user_prompt, style, size_mm, lighting, material)
+    )
+
+    if ref_bytes:
+        true_mime = _detect_true_mime(ref_bytes)
+        if true_mime in (None,"unsupported","image/svg+xml"):
+            raise HTTPException(422, "Formato immagine non supportato. Usa PNG/JPEG/WEBP.")
+        if true_mime not in SUPPORTED_MIME:
+            raise HTTPException(422, f"Formato non accettato: {true_mime}.")
+        if len(ref_bytes) > MAX_IMAGE_BYTES:
+            raise HTTPException(413, "Immagine troppo grande (>18MB).")
+        ref_mime = true_mime
+
+    parts = [PIPELINE_VERSION, IMAGE_MODEL_ID, ("i2i" if ref_bytes else "text"),
+             style, str(size_mm), lighting, material, final_prompt]
+    if ref_bytes: parts.append(hashlib.sha256(ref_bytes).hexdigest())
+    cache_key = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+    cached = _cache_get(cache_key)
+    if cached is not None: return GenerateResponse(images=[_to_data_url(cached)])
+
+    try:
+        response = await asyncio.wait_for(
+            anyio.to_thread.run_sync(lambda: client.models.generate_content(
+                model=IMAGE_MODEL_ID, contents=_build_contents(final_prompt, ref_bytes, ref_mime)
+            ), cancellable=True),
+            timeout=GENAI_TIMEOUT_S,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Timeout generazione")
+    except Exception:
+        log.exception("Errore modello")
+        raise HTTPException(502, "Servizio non disponibile")
+
+    raw = _extract_first_image_bytes(response)
+    if not raw: raise HTTPException(422, "Nessuna immagine generata")
+
+    _cache_set(cache_key, raw)
+    return GenerateResponse(images=[_to_data_url(raw)])
+
+# ============================== Endpoint ====================================
+@app.post("/api/generate", response_model=GenerateResponse)
+async def generate_images(req: GenerateRequest):
+    # Normalizzazione robusta (evita 422 per input “strani”)
+    style = _norm_style(req.style)
+    size_mm = _norm_size(req.size_mm)
+    lighting = _norm_lighting(req.lighting)
+    material = _norm_material(req.material)
+
+    user_prompt = (req.prompt or "").strip()
+
+    ref_bytes, ref_mime = (None, None)
+    if isinstance(req.images, list) and req.images and isinstance(req.images[0], str):
+        ref_bytes, ref_mime = _decode_image_data_url(req.images[0])
+
+    log.info("req: has_prompt=%s, images_len=%d, decoded_img=%s, style=%s, size=%s, lighting=%s, material=%s",
+             bool(user_prompt), len(req.images or []), bool(ref_bytes), style, size_mm, lighting, material)
+
+    return await _run_inference(user_prompt, ref_bytes, ref_mime, style, size_mm, lighting, material)
+
+# ============================== Cache & Health ===============================
+def _require_admin(token: Optional[str]):
+    if ADMIN_TOKEN and token != ADMIN_TOKEN: raise HTTPException(403, "Forbidden")
+
+@app.get("/cache/stats")
+def cache_stats():
+    with _CACHE_LOCK: return {"items": len(_CACHE), "max_items": _MAX_CACHE_ITEMS}
+
+@app.post("/cache/clear")
+def cache_clear(authorization: Optional[str] = Header(None)):
+    _require_admin(authorization); _CACHE.clear(); return {"ok": True}
+
+@app.get("/health")
+def health():
+    return {"ok": True, "pipeline": PIPELINE_VERSION}
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if not os.path.exists(index_path):
+        return {"message": "Pendant Generator (tolerant) - ready"}
+    return FileResponse(index_path)
