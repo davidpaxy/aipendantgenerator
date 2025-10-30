@@ -6,90 +6,69 @@
     <title>NOVE25 Pendant Generator</title>
     <link rel="icon" href="data:," />
     <style>
-      :root{
-        color-scheme: light;
-        --bg:#ffffff; --panel:#f6f7f9; --text:#111827; --muted:#6b7280;
-        --brand:#3f3f46; --border:#e5e7eb; --ok:#16a34a; --danger:#dc2626;
-        --shadow:0 8px 30px rgba(0,0,0,.06); --radius:16px;
-      }
-      *{box-sizing:border-box}
-      html,body{height:100%}
+      :root{color-scheme:light;--bg:#fff;--panel:#f6f7f9;--text:#111827;--muted:#6b7280;--brand:#3f3f46;--border:#e5e7eb;--ok:#16a34a;--danger:#dc2626;--shadow:0 8px 30px rgba(0,0,0,.06);--radius:16px}
+      *{box-sizing:border-box} html,body{height:100%}
       body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
       header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.85);border-bottom:1px solid var(--border)}
       .container{max-width:1600px;margin:0 auto;padding:16px}
-      .brand{display:flex;align-items:center;gap:12px;font-weight:700}
-      .logo{width:60px;height:auto}
-
+      .brand{display:flex;align-items:center;gap:12px;font-weight:700}.logo{width:60px;height:auto}
       .layout{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
-      @media (max-width:960px){.layout{grid-template-columns:1fr}}
-      @media (max-width:540px){.layout{padding:12px}}
-
+      @media (max-width:960px){.layout{grid-template-columns:1fr}} @media (max-width:540px){.layout{padding:12px}}
       .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
-      .card-body{padding:16px}
-      .card-title{font-size:1.1rem;font-weight:700;margin:0 0 10px}
-      .tiny{font-size:.9rem;color:var(--muted)}
-      .muted{color:var(--muted)}
+      .card-body{padding:16px}.card-title{font-size:1.1rem;font-weight:700;margin:0 0 10px}.tiny{font-size:.9rem;color:var(--muted)}.muted{color:var(--muted)}
       .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-
-      .pill{border:1px solid var(--border);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);background:#fff;transition:.15s ease}
-      .pill:hover{border-color:#d1d5db;color:var(--text)}
-      .pill.active{color:var(--text);background:#eef2f7;border-color:#d1d5db}
-
+      .pill{border:1px solid var(--border);padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);background:#fff;transition:.15s}
+      .pill:hover{border-color:#d1d5db;color:var(--text)} .pill.active{color:var(--text);background:#eef2f7;border-color:#d1d5db}
       textarea{width:100%;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:1rem;min-height:120px}
       textarea::placeholder{color:var(--muted);opacity:.5}
-
       .btn{padding:12px 14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;font-weight:600}
+      .btn.active{outline:2px solid #111827}
       .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;padding:14px 22px;font-size:1.1rem;box-shadow:0 8px 20px rgba(0,0,0,.08)}
-      .btn:disabled{opacity:.6;cursor:not-allowed}
-      .cta-wrap{display:flex;justify-content:center;margin-top:8px}
-
+      .btn:disabled{opacity:.6;cursor:not-allowed}.cta-wrap{display:flex;justify-content:center;margin-top:8px}
       .dropzone{border:1px dashed var(--border);border-radius:12px;padding:12px;background:#fff;text-align:center;cursor:pointer;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center}
       #fileList{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-
-      /* anteprima nella dropzone */
       #fileList .preview{position:relative;display:inline-flex;align-items:center;justify-content:center;width:120px;height:120px;margin-top:10px;border:1px solid var(--border);border-radius:12px;background:#fafafa;overflow:hidden}
       #fileList .preview img{width:100%;height:100%;object-fit:contain;background:#fff}
       #fileList .remove{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);font-weight:700;line-height:1;cursor:pointer}
       #fileList .remove:hover{background:rgba(0,0,0,.65)}
-
       .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;justify-items:center}
       .thumb{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;text-align:center;padding:12px;display:flex;flex-direction:column;align-items:center;position:relative}
       .thumb img{width:100%;height:auto;max-width:1024px;max-height:1024px;object-fit:cover;aspect-ratio:1/1;background:#000;display:flex;justify-content:center;align-items:center;margin:0 auto}
-      .thumb .bar{margin-top:8px}
-      .thumb .close{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1;cursor:pointer}
+      .thumb .bar{margin-top:8px; display:flex; gap:8px; align-items:center; justify-content:center;} .thumb .close{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;line-height:1;cursor:pointer}
       .thumb .close:hover{background:rgba(0,0,0,.65)}
-
       .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:1000}
-      .lightbox.open{display:flex}
-      .lightbox img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);cursor:zoom-out}
+      .lightbox.open{display:flex} .lightbox img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);cursor:zoom-out}
       .lightbox .lightbox-close{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer}
-
-      .status{margin-top:10px;font-size:.95rem;color:var(--muted);text-align:center;min-height:1.2em}
-      .status.ok{color:var(--ok)}
-      .status.warn{color:var(--danger)}
-
-      /* Loader sotto il bottone: solo spinner, grande il doppio */
-      .loader{
-        display:none;
-        align-items:center;
-        justify-content:center;
-        margin-top:16px;
-      }
-      .loader.show{display:flex}
-      .loader .spinner{
-        width:44px;
-        height:44px;
-        border:6px solid #e5e7eb;
-        border-top-color:#6b7280;
-        border-radius:50%;
-        animation:spin .9s linear infinite;
-      }
+      .status{margin-top:10px;font-size:.95rem;color:var(--muted);text-align:center;min-height:1.2em} .status.ok{color:var(--ok)} .status.warn{color:var(--danger)}
+      .loader{display:none;align-items:center;justify-content:center;margin-top:16px}.loader.show{display:flex}
+      .loader .spinner{width:44px;height:44px;border:6px solid #e5e7eb;border-top-color:#6b7280;border-radius:50%;animation:spin .9s linear infinite}
       @keyframes spin{to{transform:rotate(360deg)}}
-
-      @media (max-width:540px){
-        .gallery{grid-template-columns:1fr;justify-items:center}
-        .thumb{max-width:420px;width:100%}
+      @media (max-width:540px){.gallery{grid-template-columns:1fr;justify-items:center}.thumb{max-width:420px;width:100%}}
+    
+      /* Nuovi bottoni argento/oro */
+      .btn-silver, .btn-gold {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: inline-block;
+        padding: 0;
       }
+      .btn-silver {
+        background: linear-gradient(145deg, #d9d9d9, #f2f2f2);
+        box-shadow: inset 0 1px 2px rgba(255,255,255,.8),
+                    inset 0 -1px 2px rgba(0,0,0,.2);
+      }
+      .btn-gold {
+        background: linear-gradient(145deg, #d4af37, #ffd700);
+        box-shadow: inset 0 1px 2px rgba(255,255,255,.8),
+                    inset 0 -1px 2px rgba(0,0,0,.3);
+      }
+      .btn-silver.active, .btn-gold.active {
+        outline: 2px solid #111827;
+      }
+
     </style>
   </head>
   <body>
@@ -104,7 +83,7 @@
 
     <main class="container">
       <div class="layout">
-        <!-- Pannello impostazioni -->
+        <!-- Impostazioni -->
         <section class="card">
           <div class="card-body">
             <div class="card-title">Impostazioni</div>
@@ -117,6 +96,7 @@
               </div>
               <div class="row">
                 <span class="tiny">Dimensione</span>
+                <span id="size-10" class="pill">10 mm</span>
                 <span id="size-20" class="pill">20 mm</span>
                 <span id="size-30" class="pill active">30 mm</span>
                 <span id="size-40" class="pill">40 mm</span>
@@ -139,7 +119,6 @@
             <div style="height:12px"></div>
             <div class="cta-wrap"><button id="generate" class="btn primary">CREA</button></div>
 
-            <!-- Loader sotto il bottone (solo spinner) -->
             <div id="loader" class="loader" aria-hidden="true">
               <div class="spinner" aria-label="Caricamento"></div>
             </div>
@@ -148,7 +127,7 @@
           </div>
         </section>
 
-        <!-- Pannello risultati -->
+        <!-- Risultati -->
         <section class="card">
           <div class="card-body">
             <div class="card-title">Risultati</div>
@@ -165,13 +144,14 @@
     </div>
 
     <script>
-      // Elementi UI
+      // UI refs
       const btn = document.getElementById('generate');
       const promptEl = document.getElementById('prompt');
       const out = document.getElementById('out');
       const statusEl = document.getElementById('status');
       const pill3d = document.getElementById('style-3d');
       const pillBas = document.getElementById('style-basrelief');
+      const size10 = document.getElementById('size-10');
       const size20 = document.getElementById('size-20');
       const size30 = document.getElementById('size-30');
       const size40 = document.getElementById('size-40');
@@ -181,57 +161,36 @@
       const browse = document.getElementById('browse');
       const drop = document.getElementById('drop');
       const dzText = document.getElementById('dzText');
-
       const loader = document.getElementById('loader');
-
-      // Config
-      const MAX_RESULTS = 8;
-      const MAX_REFS = 1; // una sola immagine
 
       // Stato
       let style = '3d';
       let size_mm = 30;
       let imagesData = []; // [dataURL] max 1
 
-      // Helpers UI
+      // Helpers
       function setStyle(s){ style=s; pill3d.classList.toggle('active', s==='3d'); pillBas.classList.toggle('active', s==='basrelief'); }
-      function setSize(mm){ size_mm=mm; [size20,size30,size40,size60].forEach(p=>p.classList.remove('active')); ({20:size20,30:size30,40:size40,60:size60}[mm]).classList.add('active'); }
+      function setSize(mm){
+        size_mm = Number(mm);
+        [size10,size20,size30,size40,size60].forEach(p=>p.classList.remove('active'));
+        ({10:size10,20:size20,30:size30,40:size40,60:size60}[size_mm]).classList.add('active');
+      }
       function setStatus(msg, kind){ statusEl.textContent = msg || ''; statusEl.className = 'status' + (kind ? ' ' + kind : ''); }
+      function showLoader(){ loader.classList.add('show'); loader.setAttribute('aria-hidden','false'); }
+      function hideLoader(){ loader.classList.remove('show'); loader.setAttribute('aria-hidden','true'); }
 
-      function showLoader(){
-        loader.classList.add('show');
-        loader.setAttribute('aria-hidden','false');
-      }
-      function hideLoader(){
-        loader.classList.remove('show');
-        loader.setAttribute('aria-hidden','true');
-      }
+      pill3d.onclick=()=>setStyle('3d'); pillBas.onclick=()=>setStyle('basrelief');
+      size10.onclick=()=>setSize(10); size20.onclick=()=>setSize(20); size30.onclick=()=>setSize(30); size40.onclick=()=>setSize(40); size60.onclick=()=>setSize(60);
 
-      pill3d.onclick=()=>setStyle('3d');
-      pillBas.onclick=()=>setStyle('basrelief');
-      size20.onclick=()=>setSize(20);
-      size30.onclick=()=>setSize(30);
-      size40.onclick=()=>setSize(40);
-      size60.onclick=()=>setSize(60);
-
-      // Drag & drop safe
+      // Drag & Drop safe
       ['dragenter','dragover','dragleave','drop'].forEach(evt=>{
         document.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); }, false);
       });
-
-      // Apri file picker
       browse && (browse.onclick=(e)=>{ e.preventDefault(); refFiles.click(); });
+      refFiles && refFiles.addEventListener('change', async ()=>{ await addFiles(refFiles.files || []); refFiles.value=''; });
 
-      // Selezione file
-      refFiles && refFiles.addEventListener('change', async ()=>{
-        await addFiles(refFiles.files || []);
-        refFiles.value = '';
-      });
-
-      // Anteprima + resize lato client
       async function fileToDataURLResized(file, maxSide = 768, mime = 'image/jpeg', quality = 0.9){
-        const img = new Image();
-        const url = URL.createObjectURL(file);
+        const img = new Image(); const url = URL.createObjectURL(file);
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
         const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
@@ -242,157 +201,119 @@
       }
 
       async function addFiles(files){
-        const f = (files && files[0]) || null;
-        if(!f) return;
+        const f = (files && files[0]) || null; if(!f) return;
         const d = await fileToDataURLResized(f, 768);
-        imagesData = [d];            // tieni SOLO la prima
-        renderFilePreview(d);        // mini-anteprima nella dropzone
+        imagesData = [d]; renderFilePreview(d);
       }
 
       function renderFilePreview(dataUrl){
         if (dzText) dzText.style.display = 'none';
         fileList.innerHTML = '';
-        const wrap = document.createElement('div');
-        wrap.className = 'preview';
-        const img = document.createElement('img');
-        img.alt = 'Anteprima';
-        img.src = dataUrl;
-        const rm = document.createElement('button');
-        rm.className = 'remove';
-        rm.setAttribute('aria-label', 'Rimuovi immagine');
-        rm.textContent = '×';
-        rm.onclick = () => {
-          imagesData = [];
-          fileList.innerHTML = '';
-          if (dzText) dzText.style.display = '';
-        };
-        wrap.appendChild(img);
-        wrap.appendChild(rm);
-        fileList.appendChild(wrap);
-      }
-
-      // Drop nella dropzone
-      if (drop){
-        const hi = ()=> drop.style.borderColor = '#9ca3af';
-        const lo = ()=> drop.style.borderColor = 'var(--border)';
-        ['dragenter','dragover'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); hi(); e.dataTransfer.dropEffect='copy'; }, false));
-        ['dragleave','drop'].forEach(evt=> drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); lo(); }, false));
-        drop.addEventListener('drop', async (e)=>{
-          const dt = e.dataTransfer; let files = [];
-          if(dt){
-            if(dt.files && dt.files.length){ files = Array.from(dt.files); }
-            else if(dt.items && dt.items.length){ files = Array.from(dt.items).filter(it=>it.kind==='file').map(it=>it.getAsFile()).filter(Boolean); }
-          }
-          await addFiles(files);
-        }, false);
+        const wrap = document.createElement('div'); wrap.className = 'preview';
+        const img = document.createElement('img'); img.alt = 'Anteprima'; img.src = dataUrl;
+        const rm = document.createElement('button'); rm.className = 'remove'; rm.setAttribute('aria-label','Rimuovi immagine'); rm.textContent = '×';
+        rm.onclick = () => { imagesData = []; fileList.innerHTML = ''; if (dzText) dzText.style.display=''; };
+        wrap.appendChild(img); wrap.appendChild(rm); fileList.appendChild(wrap);
       }
 
       // Fetch con timeout
       async function fetchWithTimeout(resource, options = {}, ms = 25000){
-        const controller = new AbortController();
-        const id = setTimeout(()=>controller.abort(), ms);
+        const controller = new AbortController(); const id = setTimeout(()=>controller.abort(), ms);
         try { return await fetch(resource, { ...options, signal: controller.signal }); }
         finally { clearTimeout(id); }
       }
 
-      // Genera
+      // Generate (default silver)
       async function generate(){
         const prompt = promptEl.value.trim();
         const hasImage = imagesData && imagesData.length > 0;
+        if (!prompt && !hasImage) { setStatus('Scrivi un motivo oppure allega un’immagine.', 'warn'); return; }
 
-        // Regole: prompt vuoto + nessuna immagine => errore; altrimenti ok
-        if (!prompt && !hasImage) {
-          setStatus('Scrivi un motivo oppure allega un’immagine.', 'warn');
-          return;
-        }
-
-        btn.disabled = true;
-        setStatus(!prompt && hasImage ? 'Interpreto l’immagine e genero il pendente…' : 'Generazione in corso…');
-        showLoader();
-
+        btn.disabled = true; setStatus(!prompt && hasImage ? 'Interpreto l’immagine…' : 'Generazione in corso…'); showLoader();
         try{
           const payload = {
-            prompt,                 // può essere stringa vuota (caption lato server)
-            style,                  // '3d' | 'basrelief'
-            size_mm,                // 20 | 30 | 40 | 60
+            prompt,
+            style,
+            size_mm: Number(size_mm),
             images: hasImage ? [imagesData[0]] : [],
             format: 'png',
-            width: 1024,            // output sempre 1024×1024 lato server
+            width: 1024,
             height: 1024
+            // material NON inviato: default backend = "silver"
           };
-
-          const res = await fetchWithTimeout('/api/generate', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify(payload)
-          }, 25000);
-
-          if(!res.ok){
-            const raw = await res.text();
-            setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn');
-            return;
-          }
-          const ct = res.headers.get('content-type') || '';
-          if(!ct.includes('application/json')){
-            const raw = await res.text();
-            setStatus(`Risposta non-JSON: ${raw.slice(0,200)}`, 'warn');
-            return;
-          }
+          const res = await fetchWithTimeout('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }, 25000);
+          if(!res.ok){ const raw = await res.text(); setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn'); return; }
           const data = await res.json();
-          if(!Array.isArray(data.images) || data.images.length === 0){
-            setStatus('Nessuna immagine generata.', 'warn');
-            return;
-          }
+          if(!data.images || !data.images.length){ setStatus('Nessuna immagine generata.', 'warn'); return; }
           data.images.forEach(addResult);
           setStatus('Fatto ✅','ok');
-        }catch(e){
-          setStatus(`Errore di rete: ${e.message}`, 'warn');
-          console.error(e);
-        } finally{
-          btn.disabled = false;
-          hideLoader();
-        }
+        }catch(e){ setStatus(`Errore di rete: ${e.message}`, 'warn'); console.error(e); }
+        finally{ btn.disabled=false; hideLoader(); }
       }
 
+      // Aggiunge la card risultato + bottoni materiale
       function addResult(dataUrl){
-        const fig = document.createElement('div'); fig.className = 'thumb';
-        const img = document.createElement('img'); img.src = dataUrl; img.alt = 'Immagine generata';
+        const fig = document.createElement('div'); fig.className='thumb';
+        // salva l’originale (argento) per tornare senza rigenerare
+        fig.dataset.orig = dataUrl; fig.dataset.mat='silver';
+
+        const img = document.createElement('img'); img.src = dataUrl; img.alt='Immagine generata';
         img.addEventListener('click', ()=> openLightbox(img.src), {passive:true});
-        const close = document.createElement('button'); close.className = 'close'; close.setAttribute('aria-label','Rimuovi'); close.textContent = '×';
+
+        const close = document.createElement('button'); close.className='close'; close.setAttribute('aria-label','Rimuovi'); close.textContent='×';
         close.onclick = ()=>{ fig.remove(); };
-        const bar = document.createElement('div'); bar.className = 'bar';
-        const dl = document.createElement('button'); dl.className = 'btn'; dl.textContent = 'Scarica'; dl.onclick = ()=> downloadDataUrl(dataUrl, 'pendant-1024.png');
+
+        const bar = document.createElement('div'); bar.className='bar';
+        const dl = document.createElement('button'); dl.className='btn'; dl.textContent='Scarica'; dl.onclick=()=> downloadDataUrl(img.src, 'pendant-1024.png');
         bar.appendChild(dl);
+
+        const silverBtn = document.createElement('button'); silverBtn.className='btn-silver active';
+        const goldBtn = document.createElement('button'); goldBtn.className='btn-gold';
+
+        silverBtn.onclick = ()=>{ img.src = fig.dataset.orig; fig.dataset.mat='silver'; silverBtn.classList.add('active'); goldBtn.classList.remove('active'); };
+        goldBtn.onclick = ()=> regenerateWithMaterial(fig, img, silverBtn, goldBtn, 'gold');
+
+        bar.appendChild(silverBtn); bar.appendChild(goldBtn);
         fig.appendChild(img); fig.appendChild(close); fig.appendChild(bar);
         out.appendChild(fig);
-        while(out.children.length > MAX_RESULTS){ out.removeChild(out.firstElementChild); }
+        while(out.children.length > 8){ out.removeChild(out.firstElementChild); }
       }
 
       // Lightbox
       const lightbox = document.getElementById('lightbox');
       const lightboxImg = document.getElementById('lightbox-img');
       const lightboxClose = lightbox.querySelector('.lightbox-close');
-      function openLightbox(src){
-        lightboxImg.src = src;
-        lightbox.classList.add('open');
-        lightbox.setAttribute('aria-hidden','false');
-        document.body.style.overflow = 'hidden';
-      }
-      function closeLightbox(){
-        lightbox.classList.remove('open');
-        lightbox.setAttribute('aria-hidden','true');
-        lightboxImg.src = '';
-        document.body.style.overflow = '';
-      }
-      lightbox.addEventListener('click', (e)=>{
-        if(e.target === lightbox || e.target === lightboxImg || e.target === lightboxClose){ closeLightbox(); }
-      }, {passive:true});
-      window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && lightbox.classList.contains('open')) closeLightbox(); });
+      function openLightbox(src){ lightboxImg.src = src; lightbox.classList.add('open'); lightbox.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
+      function closeLightbox(){ lightbox.classList.remove('open'); lightbox.setAttribute('aria-hidden','true'); lightboxImg.src=''; document.body.style.overflow=''; }
+      lightbox.addEventListener('click', (e)=>{ if(e.target===lightbox || e.target===lightboxImg || e.target===lightboxClose){ closeLightbox(); } }, {passive:true});
+      window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && lightbox.classList.contains('open')) closeLightbox(); });
 
-      function downloadDataUrl(dataUrl, filename){
-        const a = document.createElement('a');
-        a.href = dataUrl; a.download = filename || 'image.png';
-        document.body.appendChild(a); a.click(); a.remove();
+      function downloadDataUrl(dataUrl, filename){ const a=document.createElement('a'); a.href=dataUrl; a.download=filename||'image.png'; document.body.appendChild(a); a.click(); a.remove(); }
+
+      // i2i (oro) usando SEMPRE l’originale generato
+      async function regenerateWithMaterial(fig, img, silverBtn, goldBtn, material){
+        showLoader();
+        try{
+          const payload = {
+            prompt: promptEl.value.trim(),
+            style,
+            size_mm: Number(size_mm),
+            images: [ fig.dataset.orig ],
+            format: 'png',
+            width: 1024,
+            height: 1024,
+            material // 'gold'
+          };
+          const res = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          if(!res.ok){ const raw = await res.text(); setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn'); return; }
+          const data = await res.json();
+          if(data.images && data.images.length){
+            img.src = data.images[0]; fig.dataset.mat = material;
+            goldBtn.classList.add('active'); silverBtn.classList.remove('active');
+            setStatus('Fatto ✅','ok');
+          } else { setStatus('Nessuna immagine generata.', 'warn'); }
+        }catch(e){ console.error(e); setStatus(`Errore: ${e.message}`, 'warn'); }
+        finally{ hideLoader(); }
       }
 
       // Bind
