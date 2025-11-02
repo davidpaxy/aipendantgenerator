@@ -173,9 +173,9 @@ def _extra_rules_10mm() -> str:
         "- Silhouette liscia e leggibile da lontano; nessuna micro-frastagliatura.\n"
         "- Bevel/smussi principali equivalenti a 0.30–0.40 mm; spigoli non taglienti.\n"
         "- Vietate micro-incisioni, micro-pori e texture fini: **rimuoverle**.\n"
-        "- Suture craniche rese come 2–3 solchi continui e puliti, non spezzettati.\n"
-        "- Denti: blocchi semplificati (gruppi), separazioni minime; niente dentini sottili.\n"
-        "- Orbite e cavità: profonde e scure, ma bordi arrotondati; evitare creste sottili.\n"
+
+  
+    
         "- Nessun elemento < 1.0 mm; parti sottili → ispessire e raccordare.\n"
     )
 
@@ -235,8 +235,9 @@ def _lod_policy_text(size_mm: int) -> str:
             "- Priorità a silhouette e volumi primari; CONSENTITA semplificazione/aggregazione.\n"
             "- Bevel bordi principali: 0.30–0.40 mm (spigoli morbidi e continui).\n"
             "- **Rimuovi** micro-incisioni (<0.25 mm), pori e trame fini; NO rumore.\n"
-            "- Suture: 2–3 solchi ampi e puliti; denti a blocchi leggibili.\n"
+        
             "- Nessun elemento strutturale < 1.0 mm: ispessire e raccordare.\n"
+            "- Rispetta sempre gli spessori strutturali minimi (≥ 1.0 mm) per parti portanti.\n"
         )
     if key == 20:
         return (
@@ -244,14 +245,16 @@ def _lod_policy_text(size_mm: int) -> str:
             "- Mantieni volumi primari; dettagli secondari solo se migliorano la leggibilità.\n"
             "- Bevel bordi: 0.20–0.30 mm.\n"
             "- Incisioni principali sì; evita micro-incisioni fitte e grana granulare.\n"
+            "- Rispetta sempre gli spessori strutturali minimi (≥ 1.0 mm) per parti portanti.\n"
         )
     if key == 30:
         return (
             "LOD 30mm — DETTAGLIO A BUONA DEFINIZIONE:\n"
             "- Maggiore precisione di bordi e interruzioni; micro-dettaglio ammesso se migliora la lettura.\n"
             "- Bevel bordi: 0.16–0.24 mm (spigoli più nitidi ma non taglienti).\n"
-            "- Suture nette e continue; cavità con profondità percepibile.\n"
-            "- Denti separati con solchi puliti; evita solo la grana casuale/rumorosa.\n"
+            "- Rispetta sempre gli spessori strutturali minimi (≥ 1.0 mm) per parti portanti.\n"
+
+
         )
     if key == 40:
         return (
@@ -259,6 +262,7 @@ def _lod_policy_text(size_mm: int) -> str:
             "- Bevel bordi: 0.14–0.20 mm.\n"
             "- Ammesse incisioni fini coerenti; suture e fessure nitide ma non fragili.\n"
             "- Pori/segni superficiali solo accennati e distribuiti con criterio (no pattern rumoroso).\n"
+            "- Rispetta sempre gli spessori strutturali minimi (≥ 1.0 mm) per parti portanti.\n"
         )
     return (
         "LOD 60mm — MICRO-DETTAGLIO CONTROLLATO:\n"
@@ -273,7 +277,7 @@ def _detail_instruction(size_mm: int) -> str:
     return {
         10: "Rielabora e semplifica: pochi segni grossi e puliti; elimina micro-texture e dentini sottili.",
         20: "Semplifica i pattern minuti; privilegia silhouette e tratti iconici, dettaglio solo dove serve.",
-        30: "Buona definizione: linee nitide e pulite; suture nette; denti separati; dettagli fini controllati (no grana).",
+        30: "Buona definizione: dettagliato;  dettagli fini controllati (no grana).",
         40: "Dettaglio alto ma ordinato; incidi fine dove migliora la lettura; evita trame ‘a rumore’.",
         60: "Introduci micro-dettaglio coerente (micro-incisioni/pori lievi); mantieni robustezza e pulizia generale."
     }[key]
