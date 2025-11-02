@@ -11,7 +11,7 @@
       body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
       header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.85);border-bottom:1px solid var(--border)}
       .container{max-width:1600px;margin:0 auto;padding:16px}
-      .brand{display:flex;align-items:center;gap:12px;font-weight:700}.logo{width:60px;height:auto}
+      .brand{display:flex;align-items:center;gap:12px;font-weight:700}.logo{width:60px;height:auto;margin-left: 16px}
       .layout{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
       @media (max-width:960px){.layout{grid-template-columns:1fr}} @media (max-width:540px){.layout{padding:12px}}
       .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
@@ -40,35 +40,15 @@
       .lightbox.open{display:flex} .lightbox img{max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);cursor:zoom-out}
       .lightbox .lightbox-close{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:999px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer}
       .status{margin-top:10px;font-size:.95rem;color:var(--muted);text-align:center;min-height:1.2em} .status.ok{color:var(--ok)} .status.warn{color:var(--danger)}
-      .loader{display:none;align-items:center;justify-content:center;margin-top:16px}.loader.show{display:flex}
-      .loader .spinner{width:44px;height:44px;border:6px solid #e5e7eb;border-top-color:#6b7280;border-radius:50%;animation:spin .9s linear infinite}
+      #loader { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; align-items: center; justify-content: center; z-index: 2000; }
+      #loader.show { display: flex; }
+      #loader .spinner { width: 44px; height: 44px; border: 6px solid #e5e7eb; border-top-color: #6b7280; border-radius: 50%; animation: spin .9s linear infinite; }
       @keyframes spin{to{transform:rotate(360deg)}}
       @media (max-width:540px){.gallery{grid-template-columns:1fr;justify-items:center}.thumb{max-width:420px;width:100%}}
-    
-      /* Nuovi bottoni argento/oro */
-      .btn-silver, .btn-gold {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: none;
-        cursor: pointer;
-        display: inline-block;
-        padding: 0;
-      }
-      .btn-silver {
-        background: linear-gradient(145deg, #d9d9d9, #f2f2f2);
-        box-shadow: inset 0 1px 2px rgba(255,255,255,.8),
-                    inset 0 -1px 2px rgba(0,0,0,.2);
-      }
-      .btn-gold {
-        background: linear-gradient(145deg, #d4af37, #ffd700);
-        box-shadow: inset 0 1px 2px rgba(255,255,255,.8),
-                    inset 0 -1px 2px rgba(0,0,0,.3);
-      }
-      .btn-silver.active, .btn-gold.active {
-        outline: 2px solid #111827;
-      }
-
+      .btn-silver, .btn-gold { width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; display: inline-block; padding: 0; }
+      .btn-silver { background: linear-gradient(145deg, #d9d9d9, #f2f2f2); box-shadow: inset 0 1px 2px rgba(255,255,255,.8), inset 0 -1px 2px rgba(0,0,0,.2); }
+      .btn-gold { background: linear-gradient(145deg, #d4af37, #ffd700); box-shadow: inset 0 1px 2px rgba(255,255,255,.8), inset 0 -1px 2px rgba(0,0,0,.3); }
+      .btn-silver.active, .btn-gold.active { outline: 2px solid #111827; }
     </style>
   </head>
   <body>
@@ -96,7 +76,7 @@
               </div>
               <div class="row">
                 <span class="tiny">Dimensione</span>
-                <span id="size-10" class="pill">10 mm</span>
+                <span id="size-10" class="pill">Charm</span>
                 <span id="size-20" class="pill">20 mm</span>
                 <span id="size-30" class="pill active">30 mm</span>
                 <span id="size-40" class="pill">40 mm</span>
@@ -166,7 +146,7 @@
       // Stato
       let style = '3d';
       let size_mm = 30;
-      let imagesData = []; // [dataURL] max 1
+      let imagesData = []; // [dataURL] max 1 — sempre 1024×1024 "iscritta"
 
       // Helpers
       function setStyle(s){ style=s; pill3d.classList.toggle('active', s==='3d'); pillBas.classList.toggle('active', s==='basrelief'); }
@@ -186,24 +166,47 @@
       ['dragenter','dragover','dragleave','drop'].forEach(evt=>{
         document.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); }, false);
       });
+      drop && drop.addEventListener('drop', async (e)=>{
+        const files = e.dataTransfer?.files || [];
+        await addFiles(files);
+      });
       browse && (browse.onclick=(e)=>{ e.preventDefault(); refFiles.click(); });
       refFiles && refFiles.addEventListener('change', async ()=>{ await addFiles(refFiles.files || []); refFiles.value=''; });
 
-      async function fileToDataURLResized(file, maxSide = 768, mime = 'image/jpeg', quality = 0.9){
-        const img = new Image(); const url = URL.createObjectURL(file);
+      // === Immagine iscritta (contain) in 1024×1024, senza tagli ===
+      async function fileToSquareDataURL(file, size = 1024, mime = 'image/png', quality = 0.92){
+        const img = new Image();
+        const url = URL.createObjectURL(file);
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = size; canvas.height = size;
+
+        // Sfondo: bianco
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+
+        // contain
+        const scale = Math.min(size / img.width, size / img.height);
+        const newW = Math.round(img.width * scale);
+        const newH = Math.round(img.height * scale);
+        const offsetX = Math.floor((size - newW) / 2);
+        const offsetY = Math.floor((size - newH) / 2);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, offsetX, offsetY, newW, newH);
+
         URL.revokeObjectURL(url);
         return canvas.toDataURL(mime, quality);
       }
 
       async function addFiles(files){
         const f = (files && files[0]) || null; if(!f) return;
-        const d = await fileToDataURLResized(f, 768);
-        imagesData = [d]; renderFilePreview(d);
+        const d = await fileToSquareDataURL(f, 1024, 'image/png', 0.92);
+        imagesData = [d];
+        renderFilePreview(d);
       }
 
       function renderFilePreview(dataUrl){
@@ -216,11 +219,31 @@
         wrap.appendChild(img); wrap.appendChild(rm); fileList.appendChild(wrap);
       }
 
-      // Fetch con timeout
-      async function fetchWithTimeout(resource, options = {}, ms = 25000){
-        const controller = new AbortController(); const id = setTimeout(()=>controller.abort(), ms);
-        try { return await fetch(resource, { ...options, signal: controller.signal }); }
-        finally { clearTimeout(id); }
+      // ---------- FETCH ROBUSTA (timeout 70s + 1 retry su abort/timeout) ----------
+      const RES_TIMEOUT_MS = 70000; // 70s > timeout server (60s)
+
+      async function fetchWithTimeout(resource, options = {}, ms = RES_TIMEOUT_MS){
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(new DOMException('timeout','TimeoutError')), ms);
+        try {
+          return await fetch(resource, { keepalive:false, ...options, signal: controller.signal });
+        } finally {
+          clearTimeout(id);
+        }
+      }
+
+      async function fetchWithRetry(resource, options = {}, ms = RES_TIMEOUT_MS, retries = 1){
+        try {
+          return await fetchWithTimeout(resource, options, ms);
+        } catch (e) {
+          const isAbort = e?.name === 'AbortError' || e?.name === 'TimeoutError';
+          if (isAbort && retries > 0) {
+            // breve backoff (utile se il server stava facendo reload)
+            await new Promise(r => setTimeout(r, 1200));
+            return await fetchWithRetry(resource, options, ms, retries - 1);
+          }
+          throw e;
+        }
       }
 
       // Generate (default silver)
@@ -229,7 +252,7 @@
         const hasImage = imagesData && imagesData.length > 0;
         if (!prompt && !hasImage) { setStatus('Scrivi un motivo oppure allega un’immagine.', 'warn'); return; }
 
-        btn.disabled = true; setStatus(!prompt && hasImage ? 'Interpreto l’immagine…' : 'Generazione in corso…'); showLoader();
+        btn.disabled = true; setStatus(!prompt && hasImage ? 'Preparo l’immagine…' : 'Generazione in corso…'); showLoader();
         try{
           const payload = {
             prompt,
@@ -241,14 +264,23 @@
             height: 1024
             // material NON inviato: default backend = "silver"
           };
-          const res = await fetchWithTimeout('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }, 25000);
+          const res = await fetchWithRetry('/api/generate', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          }, RES_TIMEOUT_MS);
           if(!res.ok){ const raw = await res.text(); setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn'); return; }
           const data = await res.json();
           if(!data.images || !data.images.length){ setStatus('Nessuna immagine generata.', 'warn'); return; }
           data.images.forEach(addResult);
           setStatus('Fatto ✅','ok');
-        }catch(e){ setStatus(`Errore di rete: ${e.message}`, 'warn'); console.error(e); }
-        finally{ btn.disabled=false; hideLoader(); }
+        }catch(e){
+          console.error(e);
+          const isAbort = e?.name === 'AbortError' || e?.name === 'TimeoutError';
+          setStatus(isAbort ? 'Timeout/connessione interrotta: ritenta.' : `Errore di rete: ${e.message}`, 'warn');
+        } finally {
+          btn.disabled=false; hideLoader();
+        }
       }
 
       // Aggiunge la card risultato + bottoni materiale
@@ -304,16 +336,27 @@
             height: 1024,
             material // 'gold'
           };
-          const res = await fetch('/api/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          const res = await fetchWithRetry('/api/generate', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          }, RES_TIMEOUT_MS);
           if(!res.ok){ const raw = await res.text(); setStatus(`Errore ${res.status}: ${raw.slice(0,200)}`, 'warn'); return; }
           const data = await res.json();
           if(data.images && data.images.length){
             img.src = data.images[0]; fig.dataset.mat = material;
             goldBtn.classList.add('active'); silverBtn.classList.remove('active');
             setStatus('Fatto ✅','ok');
-          } else { setStatus('Nessuna immagine generata.', 'warn'); }
-        }catch(e){ console.error(e); setStatus(`Errore: ${e.message}`, 'warn'); }
-        finally{ hideLoader(); }
+          } else {
+            setStatus('Nessuna immagine generata.', 'warn');
+          }
+        }catch(e){
+          console.error(e);
+          const isAbort = e?.name === 'AbortError' || e?.name === 'TimeoutError';
+          setStatus(isAbort ? 'Timeout/connessione interrotta: ritenta.' : `Errore di rete: ${e.message}`, 'warn');
+        } finally {
+          hideLoader();
+        }
       }
 
       // Bind
